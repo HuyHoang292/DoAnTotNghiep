@@ -13,9 +13,11 @@ exports.login = async (req, res) => {
     }
 
     const user = await db('users')
-      .where('email', username)
-      .orWhere('national_id', username)
-      .orWhere('phone', username)
+      .where(function () {
+        this.where('email', username)
+          .orWhere('national_id', username)
+          .orWhere('phone', username);
+      })
       .first();
 
     if (!user) {

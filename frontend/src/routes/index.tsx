@@ -1,63 +1,54 @@
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useState } from "react";
-import { ShieldCheck, Lock, User as UserIcon, Loader2 } from "lucide-react";
+import { createFileRoute, useNavigate } from '@tanstack/react-router'
+import { useState } from 'react'
+import { ShieldCheck, Lock, User as UserIcon, Loader2 } from 'lucide-react'
+import { clearToken, loginRequest, setToken } from '@/lib/api'
 
-export const Route = createFileRoute("/")({
+export const Route = createFileRoute('/')({
   component: LoginPage,
-});
+})
 
 function LoginPage() {
-  const navigate = useNavigate();
-  const [username, setUsername] = useState("");
-  const [password, setPassword] = useState("");
-  const [error, setError] = useState("");
-  const [loading, setLoading] = useState(false);
+  const navigate = useNavigate()
+  const [username, setUsername] = useState('')
+  const [password, setPassword] = useState('')
+  const [error, setError] = useState('')
+  const [loading, setLoading] = useState(false)
 
   const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError("");
+    e.preventDefault()
+    setError('')
     if (!username.trim() || !password.trim()) {
-      setError("Vui lòng nhập đầy đủ thông tin.");
-      return;
+      setError('Vui lòng nhập đầy đủ thông tin.')
+      return
     }
 
-    setLoading(true);
+    setLoading(true)
     try {
-      const res = await fetch("http://localhost:5000/api/auth/login", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ username, password }),
-      });
-      const data = await res.json();
-      setLoading(false);
+      const data = await loginRequest(username.trim(), password)
+      setToken(data.token)
 
-      if (!res.ok) {
-        setError(data.message || "Đăng nhập thất bại.");
-        return;
-      }
-
-      localStorage.setItem("access_token", data.token);
-      
-      if (data.user.role === "CITIZEN") {
-        navigate({ to: "/citizen/dashboard" });
+      if (data.user.role === 'CITIZEN') {
+        navigate({ to: '/citizen/dashboard' })
       } else {
-        navigate({ to: "/officer/dashboard" });
+        navigate({ to: '/officer/dashboard' })
       }
-    } catch {
-      setLoading(false);
-      setError("Không thể kết nối đến máy chủ.");
+    } catch (err) {
+      clearToken()
+      setError(err instanceof Error ? err.message : 'Đăng nhập thất bại.')
+    } finally {
+      setLoading(false)
     }
-  };
+  }
 
-  const quick = (type: "citizen" | "officer") => {
-    if (type === "citizen") {
-      setUsername("001095999888");
-      setPassword("123456");
+  const quick = (type: 'citizen' | 'officer') => {
+    if (type === 'citizen') {
+      setUsername('001095999888')
+      setPassword('123456')
     } else {
-      setUsername("officer@traffic.gov.vn");
-      setPassword("123456");
+      setUsername('officer@traffic.gov.vn')
+      setPassword('123456')
     }
-  };
+  }
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-gray-100 p-4">
@@ -69,7 +60,9 @@ function LoginPage() {
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label className="block text-sm font-medium">Tên đăng nhập / CCCD / Email</label>
+            <label className="block text-sm font-medium">
+              Tên đăng nhập / CCCD / Email
+            </label>
             <div className="relative mt-1">
               <UserIcon className="absolute left-3 top-2.5 h-5 w-5 text-gray-400" />
               <input
@@ -78,6 +71,7 @@ function LoginPage() {
                 onChange={(e) => setUsername(e.target.value)}
                 className="w-full rounded-md border py-2 pl-10 pr-3 focus:outline-none focus:ring-2 focus:ring-blue-500"
                 placeholder="Nhập Email hoặc CCCD"
+                autoComplete="username"
               />
             </div>
           </div>
@@ -92,6 +86,7 @@ function LoginPage() {
                 onChange={(e) => setPassword(e.target.value)}
                 className="w-full rounded-md border py-2 pl-10 pr-3 focus:outline-none focus:ring-2 focus:ring-blue-500"
                 placeholder="••••••"
+                autoComplete="current-password"
               />
             </div>
           </div>
@@ -109,9 +104,16 @@ function LoginPage() {
         </form>
 
         <div className="mt-4 text-center text-xs text-gray-500">
-          Demo: <button type="button" onClick={() => quick("citizen")} className="underline">Citizen</button> | <button type="button" onClick={() => quick("officer")} className="underline">Officer</button>
+          Demo:{' '}
+          <button type="button" onClick={() => quick('citizen')} className="underline">
+            Citizen
+          </button>{' '}
+          |{' '}
+          <button type="button" onClick={() => quick('officer')} className="underline">
+            Officer
+          </button>
         </div>
       </div>
     </div>
-  );
+  )
 }
