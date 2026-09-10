@@ -1,3 +1,11 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+body {
+  @apply bg-slate-100 text-slate-900 antialiased;
+}
+
+.plate {
+  @apply inline-flex rounded border border-red-700 bg-white px-1.5 py-0.5 font-mono text-xs font-bold tracking-wide text-red-700;
+}
