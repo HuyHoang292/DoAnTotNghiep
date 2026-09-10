@@ -10,7 +10,11 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as CitizenRouteImport } from './routes/citizen'
+import { Route as OfficerRouteImport } from './routes/officer'
+import { Route as CitizenIndexRouteImport } from './routes/citizen/index'
 import { Route as CitizenDashboardRouteImport } from './routes/citizen/dashboard'
+import { Route as OfficerIndexRouteImport } from './routes/officer/index'
 import { Route as OfficerDashboardRouteImport } from './routes/officer/dashboard'
 
 const IndexRoute = IndexRouteImport.update({
@@ -18,45 +22,91 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
-const CitizenDashboardRoute = CitizenDashboardRouteImport.update({
-  id: '/citizen/dashboard',
-  path: '/citizen/dashboard',
+const CitizenRoute = CitizenRouteImport.update({
+  id: '/citizen',
+  path: '/citizen',
   getParentRoute: () => rootRouteImport,
 } as any)
-const OfficerDashboardRoute = OfficerDashboardRouteImport.update({
-  id: '/officer/dashboard',
-  path: '/officer/dashboard',
+const OfficerRoute = OfficerRouteImport.update({
+  id: '/officer',
+  path: '/officer',
   getParentRoute: () => rootRouteImport,
+} as any)
+const CitizenIndexRoute = CitizenIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => CitizenRoute,
+} as any)
+const CitizenDashboardRoute = CitizenDashboardRouteImport.update({
+  id: '/dashboard',
+  path: '/dashboard',
+  getParentRoute: () => CitizenRoute,
+} as any)
+const OfficerIndexRoute = OfficerIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => OfficerRoute,
+} as any)
+const OfficerDashboardRoute = OfficerDashboardRouteImport.update({
+  id: '/dashboard',
+  path: '/dashboard',
+  getParentRoute: () => OfficerRoute,
 } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/citizen': typeof CitizenRouteWithChildren
+  '/officer': typeof OfficerRouteWithChildren
   '/citizen/dashboard': typeof CitizenDashboardRoute
   '/officer/dashboard': typeof OfficerDashboardRoute
+  '/citizen/': typeof CitizenIndexRoute
+  '/officer/': typeof OfficerIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/citizen/dashboard': typeof CitizenDashboardRoute
   '/officer/dashboard': typeof OfficerDashboardRoute
+  '/citizen': typeof CitizenIndexRoute
+  '/officer': typeof OfficerIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/citizen': typeof CitizenRouteWithChildren
+  '/officer': typeof OfficerRouteWithChildren
   '/citizen/dashboard': typeof CitizenDashboardRoute
   '/officer/dashboard': typeof OfficerDashboardRoute
+  '/citizen/': typeof CitizenIndexRoute
+  '/officer/': typeof OfficerIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/citizen/dashboard' | '/officer/dashboard'
+  fullPaths:
+    | '/'
+    | '/citizen'
+    | '/officer'
+    | '/citizen/dashboard'
+    | '/officer/dashboard'
+    | '/citizen/'
+    | '/officer/'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/citizen/dashboard' | '/officer/dashboard'
-  id: '__root__' | '/' | '/citizen/dashboard' | '/officer/dashboard'
+  to:
+    '/' | '/citizen/dashboard' | '/officer/dashboard' | '/citizen' | '/officer'
+  id:
+    | '__root__'
+    | '/'
+    | '/citizen'
+    | '/officer'
+    | '/citizen/dashboard'
+    | '/officer/dashboard'
+    | '/citizen/'
+    | '/officer/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
-  CitizenDashboardRoute: typeof CitizenDashboardRoute
-  OfficerDashboardRoute: typeof OfficerDashboardRoute
+  CitizenRoute: typeof CitizenRouteWithChildren
+  OfficerRoute: typeof OfficerRouteWithChildren
 }
 
 declare module '@tanstack/react-router' {
@@ -68,27 +118,81 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/citizen': {
+      id: '/citizen'
+      path: '/citizen'
+      fullPath: '/citizen'
+      preLoaderRoute: typeof CitizenRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/officer': {
+      id: '/officer'
+      path: '/officer'
+      fullPath: '/officer'
+      preLoaderRoute: typeof OfficerRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/citizen/': {
+      id: '/citizen/'
+      path: '/'
+      fullPath: '/citizen/'
+      preLoaderRoute: typeof CitizenIndexRouteImport
+      parentRoute: typeof CitizenRoute
+    }
     '/citizen/dashboard': {
       id: '/citizen/dashboard'
-      path: '/citizen/dashboard'
+      path: '/dashboard'
       fullPath: '/citizen/dashboard'
       preLoaderRoute: typeof CitizenDashboardRouteImport
-      parentRoute: typeof rootRouteImport
+      parentRoute: typeof CitizenRoute
+    }
+    '/officer/': {
+      id: '/officer/'
+      path: '/'
+      fullPath: '/officer/'
+      preLoaderRoute: typeof OfficerIndexRouteImport
+      parentRoute: typeof OfficerRoute
     }
     '/officer/dashboard': {
       id: '/officer/dashboard'
-      path: '/officer/dashboard'
+      path: '/dashboard'
       fullPath: '/officer/dashboard'
       preLoaderRoute: typeof OfficerDashboardRouteImport
-      parentRoute: typeof rootRouteImport
+      parentRoute: typeof OfficerRoute
     }
   }
 }
 
+interface CitizenRouteChildren {
+  CitizenDashboardRoute: typeof CitizenDashboardRoute
+  CitizenIndexRoute: typeof CitizenIndexRoute
+}
+
+const CitizenRouteChildren: CitizenRouteChildren = {
+  CitizenDashboardRoute: CitizenDashboardRoute,
+  CitizenIndexRoute: CitizenIndexRoute,
+}
+
+const CitizenRouteWithChildren =
+  CitizenRoute._addFileChildren(CitizenRouteChildren)
+
+interface OfficerRouteChildren {
+  OfficerDashboardRoute: typeof OfficerDashboardRoute
+  OfficerIndexRoute: typeof OfficerIndexRoute
+}
+
+const OfficerRouteChildren: OfficerRouteChildren = {
+  OfficerDashboardRoute: OfficerDashboardRoute,
+  OfficerIndexRoute: OfficerIndexRoute,
+}
+
+const OfficerRouteWithChildren =
+  OfficerRoute._addFileChildren(OfficerRouteChildren)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
-  CitizenDashboardRoute: CitizenDashboardRoute,
-  OfficerDashboardRoute: OfficerDashboardRoute,
+  CitizenRoute: CitizenRouteWithChildren,
+  OfficerRoute: OfficerRouteWithChildren,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
