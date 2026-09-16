@@ -1,0 +1,19 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+build/
+
+# Vite
+.vite/
+
+# TanStack
+.tanstack/
+
+# Environment
+.env
+.env.*
+
+# Logs
+*.log
