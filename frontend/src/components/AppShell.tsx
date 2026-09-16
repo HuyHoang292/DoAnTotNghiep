@@ -7,8 +7,10 @@ import {
   ListChecks,
   LogOut,
   Menu,
+  ScanLine,
   ShieldCheck,
   TriangleAlert,
+  Users,
   Video,
   X,
 } from 'lucide-react'
@@ -27,9 +29,12 @@ const citizenNav = [
 
 const officerNav = [
   { to: '/officer/dashboard', label: 'Tổng quan', icon: LayoutDashboard },
-  { to: '/officer/dashboard', label: 'Hàng đợi AI', icon: ListChecks, disabled: true },
-  { to: '/officer/dashboard', label: 'Camera', icon: Video, disabled: true },
-  { to: '/officer/dashboard', label: 'Vi phạm', icon: TriangleAlert, disabled: true },
+  { to: '/officer/scan',      label: 'Quét biển số', icon: ScanLine },
+  { to: '/officer/vehicles',  label: 'Phương tiện',  icon: Car },
+  { to: '/officer/citizens',  label: 'Công dân',     icon: Users },
+  { to: '/officer/dashboard', label: 'Vi phạm',      icon: TriangleAlert, disabled: true },
+  { to: '/officer/dashboard', label: 'Hàng đợi AI',  icon: ListChecks, disabled: true },
+  { to: '/officer/dashboard', label: 'Camera',       icon: Video, disabled: true },
 ]
 
 export function AppShell({
@@ -93,10 +98,10 @@ export function AppShell({
               active
                 ? 'bg-white/15 font-medium text-white'
                 : 'text-white/70 hover:bg-white/10 hover:text-white',
-              item.disabled && 'cursor-default opacity-50 hover:bg-transparent hover:text-white/70',
+              'disabled' in item && item.disabled && 'cursor-default opacity-50 hover:bg-transparent hover:text-white/70',
             )
 
-            if (item.disabled) {
+            if ('disabled' in item && item.disabled) {
               return (
                 <span key={item.label} className={className}>
                   <Icon className="h-4 w-4" />
