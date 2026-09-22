@@ -1,35 +1,41 @@
 /**
  * plateRecognition.js
  *
- * Pipeline 2 bước nhận diện biển số xe Việt Nam:
+ * Pipeline 2 bước nhận diện biển số xe Việt Nam dùng AI service nội bộ:
  *
- *   Bước 1 – Model detect biển số:
- *     Roboflow: vietnam-license-plate-hjswj/2
+ *   Bước 1 – Model detect biển số (detect_plate.pt):
  *     → Tìm bounding box vùng biển số trong ảnh
- *     → sharp: crop + scale lên để ảnh rõ hơn
  *
- *   Bước 2 – Model OCR ký tự:
- *     Roboflow: ocr-oy9a7/1  (KHÔNG dùng prefix workspace w251ocr)
- *     → Detect từng ký tự (class = "0","1","A","B",...)
- *     → Phân loại 2 hàng (biển 2 dòng) vs 1 hàng
- *     → Sort theo tọa độ x → ghép chuỗi biển số
+ *   Bước 2 – Model OCR ký tự (read_characters.pt):
+ *     → Detect từng ký tự trên vùng biển số đã crop
+ *     → plate_utils.py ghép ký tự → chuỗi thô
+ *
+ * Cả 2 model chạy trong AI service (FastAPI) tại AI_SERVICE_URL.
+ *
+ * ─── Cấu trúc biển số Việt Nam (Thông tư 24/2023/TT-BCA) ──────────────────
+ *
+ *  Ô tô / xe tải / xe khách (biển 1 hàng):
+ *    Biển cũ  4 số : DD L-NNNN         vd: 30A-1234
+ *    Biển mới 5 số : DD L-NNN.NN       vd: 30F-123.45
+ *    Seri 2 chữ   : DD LL-NNN.NN       vd: 51DA-123.45  (DA, HC, KT, LD, MA, TĐ…)
+ *
+ *  Xe máy (biển 2 hàng, hàng trên: DD+seri, hàng dưới: số):
+ *    Seri cũ 4 số : DD LN-NNNN         vd: 29S1-1234
+ *    Seri mới 5 số: DD LN-NNN.NN       vd: 29X1-123.45
+ *    Seri LL 5 số : DD LL-NNN.NN       vd: 29AB-123.45
+ *
+ *  Ký tự bị loại khỏi seri: I, J, O, Q, W  (dễ nhầm; R dành cho rơ moóc)
+ *  Ký tự số tỉnh: 11–99 (không có 00, hầu hết từ 11–99, một số tỉnh dùng 2 mã)
  */
 
-const sharp = require('sharp');
-const { trustSystemCa } = require('../utils/trustSystemCa');
+const FormData = require('form-data');
+const axios = require('axios');
 
-trustSystemCa();
+const AI_SERVICE_URL = (process.env.AI_SERVICE_URL || 'http://localhost:8000')
+  .replace(/\/$/, '')
+  .replace(/^["']|["']$/g, '');
 
-const ROBOFLOW_API_KEY = process.env.ROBOFLOW_API_KEY || '';
-const ROBOFLOW_API_URL = (process.env.ROBOFLOW_API_URL || 'https://serverless.roboflow.com').replace(/\/$/, '');
-// Model 1: detect vùng biển số
-const PLATE_MODEL = process.env.ROBOFLOW_MODEL || 'vietnam-license-plate-hjswj';
-const PLATE_VERSION = process.env.ROBOFLOW_VERSION || '2';
-// Model 2: OCR ký tự — model id Universe là ocr-oy9a7/1
-const OCR_MODEL = process.env.ROBOFLOW_OCR_MODEL || 'ocr-oy9a7';
-const OCR_VERSION = process.env.ROBOFLOW_OCR_VER || '1';
-
-// ─── Helpers ──────────────────────────────────────────────────────────────────
+// ─── Helpers cơ bản ───────────────────────────────────────────────────────────
 
 function stripDataUrl(img) {
   if (!img || typeof img !== 'string') return '';
@@ -37,200 +43,191 @@ function stripDataUrl(img) {
   return img.startsWith('data:') && i !== -1 ? img.slice(i + 1) : img.replace(/\s/g, '');
 }
 
+/** Chuẩn hóa về chữ hoa, bỏ mọi ký tự không phải A-Z 0-9 (kể cả dấu - và .) */
 function normalizePlate(v) {
   return String(v || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
 }
 
+// ─── Phân loại & format biển số ──────────────────────────────────────────────
+
 /**
- * Format sang dạng chuẩn Việt Nam:
- *   30F12345  → 30F-123.45
- *   51G112345 → 51G1-234.56
+ * Các pattern hợp lệ của biển số dân sự Việt Nam (dạng đã normalize, không có - và .):
+ *
+ *  Ô tô 1 chữ seri:
+ *    DD L NNNN   → 7 ký tự   (biển cũ 4 số)
+ *    DD L NNNNN  → 8 ký tự   (biển mới 5 số)
+ *
+ *  Ô tô 2 chữ seri đặc biệt (DA, HC, KT, LD, MA, TĐ, KH...):
+ *    DD LL NNNNN → 9 ký tự
+ *
+ *  Xe máy seri LN (1 chữ + 1 số):
+ *    DD LN NNNN  → 8 ký tự   (biển cũ 4 số)
+ *    DD LN NNNNN → 9 ký tự   (biển mới 5 số)
+ *
+ *  Xe máy seri LL (2 chữ):
+ *    DD LL NNNNN → 9 ký tự   (biển mới 5 số, tương tự ô tô 2 chữ)
+ *
+ * Chú ý: seri xe máy LN và ô tô 2 chữ LL đều cho 9 ký tự → phân biệt
+ * bằng vị trí: pos[2]=chữ, pos[3]=số → xe máy LN; pos[2]=pos[3]=chữ → LL.
+ *
+ * Regex dùng named groups để dễ format:
+ *   (?<p>\d{2})   = mã tỉnh
+ *   (?<s>...)     = seri
+ *   (?<n>\d{4,5}) = số thứ tự
  */
-function formatVietnamPlate(raw) {
-  const s = normalizePlate(raw);
-  const m = s.match(/^(\d{2})([A-Z]{1,2})(\d{4,6})$/);
-  if (!m) return s;
-  const [, province, series, digits] = m;
-  if (digits.length >= 5) {
-    return `${province}${series}-${digits.slice(0, digits.length - 2)}.${digits.slice(-2)}`;
+const PLATE_PATTERNS = [
+  // Ô tô 1 chữ seri – 4 hoặc 5 số
+  { re: /^(?<p>\d{2})(?<s>[A-HK-NPR-Z])(?<n>\d{4,5})$/, type: 'car' },
+  // Xe máy seri 1 chữ + 1 số – 4 hoặc 5 số
+  { re: /^(?<p>\d{2})(?<s>[A-HK-NPR-Z]\d)(?<n>\d{4,5})$/, type: 'moto_ln' },
+  // Xe máy / ô tô seri 2 chữ – 5 số  (LL series: DA, HC, KT, LD, MA, AB…)
+  { re: /^(?<p>\d{2})(?<s>[A-HK-NPR-Z]{2})(?<n>\d{4,5})$/, type: 'moto_ll' },
+];
+
+function matchPlate(normalized) {
+  for (const { re, type } of PLATE_PATTERNS) {
+    const m = normalized.match(re);
+    if (m) return { ...m.groups, type };
   }
-  return `${province}${series}-${digits}`;
+  return null;
 }
 
 function looksLikePlate(t) {
-  return /^\d{2}[A-Z]{1,2}\d{4,6}$/.test(normalizePlate(t));
+  return matchPlate(normalizePlate(t)) !== null;
 }
 
-function predictionClass(p) {
-  return String(p?.class ?? p?.class_name ?? '').trim();
+/**
+ * Format chuỗi đã normalize thành dạng hiển thị chuẩn Việt Nam:
+ *   30F12345  → 30F-123.45
+ *   30A1234   → 30A-1234
+ *   29X11234  → 29X1-1234     (xe máy LN 4 số)
+ *   29X112345 → 29X1-123.45   (xe máy LN 5 số)
+ *   51DA12345 → 51DA-123.45   (seri 2 chữ)
+ */
+function formatVietnamPlate(raw) {
+  const s = normalizePlate(raw);
+  const groups = matchPlate(s);
+  if (!groups) return s; // không nhận ra → trả nguyên
+
+  const { p, s: seri, n } = groups;
+  if (n.length === 5) {
+    return `${p}${seri}-${n.slice(0, 3)}.${n.slice(3)}`;
+  }
+  // 4 số: không có dấu chấm
+  return `${p}${seri}-${n}`;
 }
 
-/** Sửa nhầm lẫn OCR theo vị trí ký tự biển Việt Nam. */
+// ─── Sửa lỗi OCR theo luật vị trí ký tự biển Việt Nam ───────────────────────
+
+/**
+ * OCR hay nhầm chữ-số tại các vị trí cố định.
+ * Áp dụng theo từng vị trí trong chuỗi đã normalize (không dấu - .).
+ *
+ * Vị trí 0, 1  → bắt buộc là số  (mã tỉnh DD)
+ * Vị trí 2     → bắt buộc là chữ (ký tự đầu seri)
+ * Vị trí 3     → chữ (ô tô LL) hoặc số (xe máy LN) hoặc số (ô tô 1 chữ)
+ *               → thử cả 2 rồi để looksLikePlate() phán quyết
+ * Vị trí 4+    → bắt buộc là số (số thứ tự)
+ *
+ * Bảng nhầm lẫn thường gặp:
+ *   Số bị đọc thành chữ : 0→O, 1→I/L, 2→Z, 5→S, 8→B, 6→G
+ *   Chữ bị đọc thành số : O→0, I→1, L→1, Z→2, S→5, B→8, G→6
+ */
+const TO_DIGIT = { O: '0', D: '0', Q: '0', I: '1', L: '1', Z: '2', S: '5', B: '8', G: '6' };
+const TO_LETTER = { '0': 'O', '1': 'I', '2': 'Z', '5': 'S', '8': 'B', '4': 'A', '6': 'G' };
+
 function coerceVietnamPlate(raw) {
   const s = normalizePlate(raw);
   if (s.length < 7 || s.length > 10) return s;
 
-  const digitish = { O: '0', D: '0', Q: '0', I: '1', L: '1', Z: '2', S: '5', B: '8', G: '6' };
-  const letterish = { '0': 'O', '1': 'I', '2': 'Z', '5': 'S', '8': 'B', '4': 'A', '6': 'G' };
+  const c = s.split('');
 
-  const chars = s.split('');
-  chars[0] = digitish[chars[0]] || chars[0];
-  chars[1] = digitish[chars[1]] || chars[1];
-  chars[2] = letterish[chars[2]] || chars[2];
+  // Vị trí 0, 1: phải là số
+  c[0] = TO_DIGIT[c[0]] ?? c[0];
+  c[1] = TO_DIGIT[c[1]] ?? c[1];
 
-  const rest = chars.slice(3);
-  const letterCount = rest.filter((c) => /[A-Z]/.test(c)).length;
-  const coercedRest = rest.map((c, idx) => {
-    if (idx === 0 && /[A-Z0-9]/.test(c)) return c;
-    if (/[A-Z]/.test(c) && letterCount <= 1 && idx === 0) return c;
-    return digitish[c] || c;
-  });
+  // Vị trí 2: phải là chữ
+  c[2] = TO_LETTER[c[2]] ?? c[2];
 
-  return chars.slice(0, 3).join('') + coercedRest.join('');
-}
+  // Vị trí 3: thử 2 khả năng – giữ nguyên để looksLikePlate() quyết định
+  // (sẽ thử cả phiên bản chữ lẫn số ở pickPlateText)
 
-function boxIou(a, b) {
-  const ax1 = a.x - a.w / 2;
-  const ay1 = a.y - a.h / 2;
-  const ax2 = a.x + a.w / 2;
-  const ay2 = a.y + a.h / 2;
-  const bx1 = b.x - b.w / 2;
-  const by1 = b.y - b.h / 2;
-  const bx2 = b.x + b.w / 2;
-  const by2 = b.y + b.h / 2;
-  const ix = Math.max(0, Math.min(ax2, bx2) - Math.max(ax1, bx1));
-  const iy = Math.max(0, Math.min(ay2, by2) - Math.max(ay1, by1));
-  const inter = ix * iy;
-  const union = a.w * a.h + b.w * b.h - inter;
-  return union <= 0 ? 0 : inter / union;
-}
-
-function nmsChars(items) {
-  const sorted = [...items].sort((a, b) => b.conf - a.conf);
-  const kept = [];
-  for (const item of sorted) {
-    if (kept.some((k) => boxIou(k, item) > 0.45)) continue;
-    kept.push(item);
+  // Vị trí 4 trở đi: phải là số
+  for (let i = 4; i < c.length; i++) {
+    c[i] = TO_DIGIT[c[i]] ?? c[i];
   }
-  return kept;
-}
 
-// ─── Roboflow call ────────────────────────────────────────────────────────────
-
-async function callRoboflow(model, version, base64, confidence = 0.25) {
-  if (!ROBOFLOW_API_KEY) throw new Error('Chưa cấu hình ROBOFLOW_API_KEY trong .env');
-
-  const confParam = confidence <= 1 ? Math.round(confidence * 100) : Math.round(confidence);
-  const url =
-    `${ROBOFLOW_API_URL}/${encodeURIComponent(model)}/${encodeURIComponent(version)}` +
-    `?api_key=${encodeURIComponent(ROBOFLOW_API_KEY)}&confidence=${confParam}&overlap=30`;
-
-  const res = await fetch(url, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: base64,
-  });
-
-  const data = await res.json().catch(() => null);
-  if (!res.ok) throw new Error(data?.message || data?.detail || `Roboflow HTTP ${res.status}`);
-  return Array.isArray(data?.predictions) ? data.predictions : [];
-}
-
-// ─── Bước 1: detect + crop vùng biển số ──────────────────────────────────────
-
-async function detectPlateBox(base64) {
-  return callRoboflow(PLATE_MODEL, PLATE_VERSION, base64, 0.25);
-}
-
-async function cropPlate(imgBuf, pred, imgW, imgH) {
-  const PAD_X = 0.04;
-  const PAD_Y = 0.08;
-  const bw = Number(pred.width || 0);
-  const bh = Number(pred.height || 0);
-  const cx = Number(pred.x || 0);
-  const cy = Number(pred.y || 0);
-
-  const left = Math.max(0, Math.floor(cx - bw / 2 - bw * PAD_X));
-  const top = Math.max(0, Math.floor(cy - bh / 2 - bh * PAD_Y));
-  const right = Math.min(imgW, Math.ceil(cx + bw / 2 + bw * PAD_X));
-  const bottom = Math.min(imgH, Math.ceil(cy + bh / 2 + bh * PAD_Y));
-  const width = right - left;
-  const height = bottom - top;
-  if (width < 8 || height < 8) return null;
-
-  const targetW = Math.max(400, width * 2);
-  const targetH = Math.round(height * (targetW / width));
-
-  return sharp(imgBuf)
-    .extract({ left, top, width, height })
-    .resize(targetW, targetH, { kernel: sharp.kernel.lanczos3 })
-    .jpeg({ quality: 92 })
-    .toBuffer();
-}
-
-// ─── Bước 2: OCR ký tự từ crop biển số ───────────────────────────────────────
-
-async function ocrPlateChars(cropBase64) {
-  return callRoboflow(OCR_MODEL, OCR_VERSION, cropBase64, 0.2);
-}
-
-function extractChar(className) {
-  const raw = String(className || '').trim().toUpperCase();
-  if (/^[A-Z0-9]$/.test(raw)) return raw;
-  const m = raw.match(/([A-Z0-9])$/);
-  return m ? m[1] : '';
+  return c.join('');
 }
 
 /**
- * Ghép danh sách ký tự detection thành chuỗi biển số:
- * - Biển 1 hàng: sort theo x
- * - Biển 2 hàng: chia thành top/bottom, ghép riêng rồi concat
+ * Từ raw OCR string, thử các biến thể sửa lỗi và trả về biển số đã format,
+ * hoặc '' nếu không match được pattern nào.
  */
-function assembleChars(chars) {
-  if (!chars.length) return '';
+function pickPlateText(raw) {
+  const s = normalizePlate(raw);
+  if (!s) return '';
 
-  const items = nmsChars(
-    chars
-      .map((c) => ({
-        ch: extractChar(predictionClass(c)),
-        x: Number(c.x),
-        y: Number(c.y),
-        w: Number(c.width),
-        h: Number(c.height),
-        conf: Number(c.confidence || 0),
-      }))
-      .filter((c) => c.ch),
-  );
-  if (!items.length) return '';
+  // Biến thể 1: giữ nguyên
+  // Biến thể 2: coerce theo luật vị trí
+  const coerced = coerceVietnamPlate(s);
 
-  const ys = items.map((i) => i.y);
-  const yMin = Math.min(...ys);
-  const yMax = Math.max(...ys);
-  const yRange = yMax - yMin;
-  const avgH = items.reduce((s, i) => s + i.h, 0) / items.length;
+  // Biến thể 3: vị trí 3 ép thành số (ô tô 1 chữ seri)
+  const asDigit3 = (() => {
+    const c = coerced.split('');
+    if (c.length > 3) c[3] = TO_DIGIT[c[3]] ?? c[3];
+    return c.join('');
+  })();
 
-  // 1 hàng: tâm ký tự lệch ít. 2 hàng: lệch khoảng 1 chiều cao ký tự.
-  const isTwoLine = yRange > avgH * 0.7 && items.length >= 6;
+  // Biến thể 4: vị trí 3 ép thành chữ (xe máy LL hoặc ô tô 2 chữ seri)
+  const asLetter3 = (() => {
+    const c = coerced.split('');
+    if (c.length > 3) c[3] = TO_LETTER[c[3]] ?? c[3];
+    return c.join('');
+  })();
 
-  let result = '';
-  if (isTwoLine) {
-    const midY = yMin + yRange / 2;
-    const top = items.filter((i) => i.y < midY).sort((a, b) => a.x - b.x);
-    const bot = items.filter((i) => i.y >= midY).sort((a, b) => a.x - b.x);
-    result = top.map((i) => i.ch).join('') + bot.map((i) => i.ch).join('');
-  } else {
-    result = items.sort((a, b) => a.x - b.x).map((i) => i.ch).join('');
-  }
-
-  return result;
-}
-
-function pickPlateText(assembled) {
-  const candidates = [assembled, coerceVietnamPlate(assembled)];
-  for (const c of candidates) {
-    if (looksLikePlate(c)) return formatVietnamPlate(c);
+  for (const candidate of [s, coerced, asDigit3, asLetter3]) {
+    if (looksLikePlate(candidate)) {
+      return formatVietnamPlate(candidate);
+    }
   }
   return '';
+}
+
+// ─── Gọi AI service nội bộ ───────────────────────────────────────────────────
+
+/**
+ * Gửi ảnh base64 lên AI service FastAPI (POST /api/ai/detect-plate)
+ * Trả về mảng detections từ 2 model YOLO nội bộ.
+ */
+async function callAiService(base64) {
+  const imgBuf = Buffer.from(base64, 'base64');
+
+  const form = new FormData();
+  form.append('file', imgBuf, {
+    filename: 'plate.jpg',
+    contentType: 'image/jpeg',
+  });
+
+  let response;
+  try {
+    response = await axios.post(`${AI_SERVICE_URL}/api/ai/detect-plate`, form, {
+      headers: form.getHeaders(),
+      timeout: 30000,
+    });
+  } catch (err) {
+    const status = err?.response?.status;
+    const msg = err?.response?.data?.detail || err?.response?.data?.message || err.message;
+    throw new Error(
+      status
+        ? `AI service lỗi HTTP ${status}: ${msg}`
+        : `Không kết nối được AI service (${AI_SERVICE_URL}). Hãy chắc chắn AI service đang chạy.`,
+    );
+  }
+
+  const data = response.data;
+  if (!data?.success) throw new Error('AI service trả về lỗi.');
+  return Array.isArray(data.detections) ? data.detections : [];
 }
 
 // ─── Main ─────────────────────────────────────────────────────────────────────
@@ -239,79 +236,52 @@ async function recognizePlateFromImage(imageDataUrl) {
   const base64 = stripDataUrl(imageDataUrl);
   if (!base64) throw new Error('Không nhận được ảnh để nhận diện.');
 
-  const imgBuf = Buffer.from(base64, 'base64');
-  const meta = await sharp(imgBuf).metadata();
-  const imgW = meta.width || 640;
-  const imgH = meta.height || 640;
+  // Gọi AI service — mỗi detection đã bao gồm plate_text và ocr_confidence
+  const detections = await callAiService(base64);
 
-  const plateBoxes = await detectPlateBox(base64);
-  const rankedBoxes = [...plateBoxes].sort(
-    (a, b) => Number(b.confidence || 0) - Number(a.confidence || 0),
+  if (!detections || detections.length === 0) {
+    return buildResult('', '', 0, [], []);
+  }
+
+  // Sắp xếp theo confidence của khung biển cao nhất
+  const ranked = [...detections].sort(
+    (a, b) => (b.plate_detection_confidence || 0) - (a.plate_detection_confidence || 0),
   );
-  const bestBox = rankedBoxes[0] || null;
 
   let plateText = '';
   let rawText = '';
-  let ocrChars = [];
-  let confidence = bestBox ? Number(bestBox.confidence || 0) : 0;
+  let confidence = 0;
 
-  if (!bestBox) {
-    console.log('[Plate] No box detected, trying full-frame OCR');
-    try {
-      const chars = await ocrPlateChars(base64);
-      ocrChars = chars;
-      rawText = assembleChars(chars);
-      plateText = pickPlateText(rawText);
-    } catch (err) {
-      console.error('[OCR full-frame error]', err.message);
-    }
-    return buildResult(plateText, rawText, confidence, [], ocrChars);
-  }
+  for (const det of ranked) {
+    const raw = String(det.plate_text || '').toUpperCase().replace(/\s/g, '');
+    rawText = rawText || raw;
+    confidence = confidence || Number(det.plate_detection_confidence || 0);
 
-  for (const box of rankedBoxes.slice(0, 3)) {
-    try {
-      const cropBuf = await cropPlate(imgBuf, box, imgW, imgH);
-      if (!cropBuf) continue;
-
-      const cropBase64 = cropBuf.toString('base64');
-      const chars = await ocrPlateChars(cropBase64);
-      ocrChars = chars;
-
-      console.log(
-        `[OCR] box conf=${(Number(box.confidence || 0) * 100).toFixed(0)}%`,
-        `chars detected:`,
-        chars.length,
-        chars.map((c) => `${predictionClass(c)}(${(Number(c.confidence || 0) * 100).toFixed(0)}%)`).join(' '),
-      );
-
-      const assembled = assembleChars(chars);
-      rawText = assembled;
-      const matched = pickPlateText(assembled);
-
-      if (matched) {
-        plateText = matched;
-        confidence = Number(box.confidence || 0);
-        break;
-      }
-    } catch (err) {
-      console.error('[OCR crop error]', err.message);
+    const matched = pickPlateText(raw);
+    if (matched) {
+      plateText = matched;
+      confidence = Number(det.plate_detection_confidence || 0);
+      rawText = raw;
+      break;
     }
   }
 
-  return buildResult(
-    plateText,
-    rawText,
-    confidence,
-    rankedBoxes.slice(0, 5).map((p) => ({
-      class: predictionClass(p) || 'license-plate',
-      confidence: Number(p.confidence || 0),
-      x: Number(p.x || 0),
-      y: Number(p.y || 0),
-      width: Number(p.width || 0),
-      height: Number(p.height || 0),
-    })),
-    ocrChars,
-  );
+  // Nếu không match định dạng, vẫn trả về rawText của khung tốt nhất
+  if (!rawText && ranked[0]) {
+    rawText = String(ranked[0].plate_text || '').toUpperCase().replace(/\s/g, '');
+    confidence = Number(ranked[0].plate_detection_confidence || 0);
+  }
+
+  const detectionList = ranked.slice(0, 5).map((d) => ({
+    class: 'license-plate',
+    confidence: Number(d.plate_detection_confidence || 0),
+    x: (d.bbox?.x1 + d.bbox?.x2) / 2 || 0,
+    y: (d.bbox?.y1 + d.bbox?.y2) / 2 || 0,
+    width: (d.bbox?.x2 - d.bbox?.x1) || 0,
+    height: (d.bbox?.y2 - d.bbox?.y1) || 0,
+  }));
+
+  return buildResult(plateText, rawText, confidence, detectionList, []);
 }
 
 function buildResult(plateText, rawText, confidence, detections, ocrChars = []) {
@@ -321,10 +291,7 @@ function buildResult(plateText, rawText, confidence, detections, ocrChars = []) 
     rawText: rawText || '',
     confidence,
     detections,
-    characters: ocrChars.slice(0, 20).map((p) => ({
-      class: predictionClass(p),
-      confidence: Number(p.confidence || 0),
-    })),
+    characters: ocrChars,
   };
 }
 

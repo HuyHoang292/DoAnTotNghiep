@@ -43,7 +43,6 @@ const VEHICLE_TYPE_LABEL: Record<string, string> = {
 const AIM_INSET = 0.15
 
 function OfficerScanPage() {
-  const videoRef = useRef<HTMLVideoElement>(null)
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const streamRef = useRef<MediaStream | null>(null)
   const scanningRef = useRef(false)
@@ -58,11 +57,27 @@ function OfficerScanPage() {
   const [result, setResult] = useState<PlateScanResult | null>(null)
   const [scanSuccess, setScanSuccess] = useState(false)
 
+  // ── Dùng ref callback thay vì useRef để gắn stream ngay khi video element mount ──
+  // Tránh race condition: setCameraOpen(true) → DOM chưa render → videoRef.current = null
+  const videoRef = useRef<HTMLVideoElement | null>(null)
+  const videoCallbackRef = useCallback((el: HTMLVideoElement | null) => {
+    videoRef.current = el
+    if (el && streamRef.current) {
+      el.srcObject = streamRef.current
+      el.muted = true
+      el.playsInline = true
+      void el.play().catch(() => undefined)
+    }
+  }, [])
+
   const stopCamera = useCallback(() => {
     streamRef.current?.getTracks().forEach((t) => t.stop())
     streamRef.current = null
     cameraOpenRef.current = false
-    if (videoRef.current) videoRef.current.srcObject = null
+    if (videoRef.current) {
+      videoRef.current.srcObject = null
+      videoRef.current.load()
+    }
   }, [])
 
   useEffect(() => {
@@ -178,10 +193,30 @@ function OfficerScanPage() {
       })
       streamRef.current = stream
       cameraOpenRef.current = true
+      // Gắn stream vào video element nếu đã mount (trường hợp re-open)
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream
+        videoRef.current.muted = true
+        videoRef.current.playsInline = true
+        void videoRef.current.play().catch(() => undefined)
+      }
+      // setCameraOpen(true) sẽ mount video element → videoCallbackRef tự gắn stream
       setCameraOpen(true)
-    } catch {
+    } catch (err) {
       cameraOpenRef.current = false
-      setError('Không mở được camera. Hãy cấp quyền camera cho trình duyệt hoặc chọn ảnh từ máy.')
+      streamRef.current = null
+      const e = err as DOMException
+      let msg = 'Không mở được camera. Hãy cấp quyền camera cho trình duyệt hoặc chọn ảnh từ máy.'
+      if (e?.name === 'NotAllowedError' || e?.name === 'PermissionDeniedError') {
+        msg = 'Trình duyệt bị chặn quyền camera. Vào Settings → Site permissions → Camera để cấp quyền.'
+      } else if (e?.name === 'NotFoundError' || e?.name === 'DevicesNotFoundError') {
+        msg = 'Không tìm thấy thiết bị camera. Hãy kết nối camera hoặc chọn ảnh từ máy.'
+      } else if (e?.name === 'NotReadableError' || e?.name === 'TrackStartError') {
+        msg = 'Camera đang được ứng dụng khác sử dụng. Hãy đóng ứng dụng đó rồi thử lại.'
+      } else if (e?.name === 'OverconstrainedError') {
+        msg = 'Camera không hỗ trợ độ phân giải yêu cầu. Thử lại hoặc chọn ảnh từ máy.'
+      }
+      setError(msg)
       setCameraOpen(false)
     }
   }
@@ -189,22 +224,20 @@ function OfficerScanPage() {
   useEffect(() => {
     if (!cameraOpen) return
     const video = videoRef.current
-    const stream = streamRef.current
-    if (!video || !stream) return
-
-    video.srcObject = stream
-    video.muted = true
-    video.playsInline = true
-    const play = () => {
-      void video.play().catch(() => undefined)
+    // Stream đã được gắn ở videoCallbackRef — ở đây chỉ đảm bảo play và khởi vòng quét
+    if (video && !video.srcObject && streamRef.current) {
+      video.srcObject = streamRef.current
+      video.muted = true
+      video.playsInline = true
     }
-    play()
-    video.addEventListener('loadedmetadata', play)
+    void videoRef.current?.play().catch(() => undefined)
 
     let cancelled = false
     const waitThenLoop = async () => {
+      // Đợi video sẵn sàng (tối đa 5 giây)
       for (let i = 0; i < 50 && !cancelled; i += 1) {
-        if (video.readyState >= 2 && video.videoWidth > 0) break
+        const v = videoRef.current
+        if (v && v.readyState >= 2 && v.videoWidth > 0) break
         await new Promise((r) => setTimeout(r, 100))
       }
       if (cancelled) return
@@ -221,7 +254,6 @@ function OfficerScanPage() {
 
     return () => {
       cancelled = true
-      video.removeEventListener('loadedmetadata', play)
     }
   }, [cameraOpen, scanCameraFrame])
 
@@ -287,7 +319,7 @@ function OfficerScanPage() {
     <>
       <PageHeader
         title="Quét biển số xe"
-        description="Bước 1: Roboflow tìm khung biển số. Bước 2: OCR ký tự trong khung đó — tra cứu chủ xe và lịch sử vi phạm."
+        description="Bước 1: Model detect_plate.pt tìm khung biển số. Bước 2: Model read_characters.pt đọc ký tự trong khung đó — tra cứu chủ xe và lịch sử vi phạm."
       />
 
       {/* ── Khung điều khiển ── */}
@@ -363,7 +395,7 @@ function OfficerScanPage() {
 
           <span className="ml-auto text-xs text-slate-400 flex items-center gap-1">
             <ZapIcon className="h-3 w-3 text-amber-400" />
-            2 mô hình Roboflow: khung biển số + OCR ký tự
+            2 model YOLO nội bộ: detect_plate.pt + read_characters.pt
           </span>
         </div>
       </section>
@@ -388,7 +420,7 @@ function OfficerScanPage() {
           {/* Viewport camera hình vuông */}
           <div className="relative mx-auto aspect-square w-full max-w-sm overflow-hidden rounded-2xl bg-black shadow-lg">
             <video
-              ref={videoRef}
+              ref={videoCallbackRef}
               autoPlay
               playsInline
               muted
@@ -434,7 +466,7 @@ function OfficerScanPage() {
             Quét ngay
           </button>
           <p className="mt-2 text-center text-xs text-white/50">
-            Ảnh lấy từ khung xanh rồi gửi Roboflow (detect biển số + OCR ký tự)
+            Ảnh lấy từ khung xanh rồi gửi AI service nội bộ (detect biển số + OCR ký tự)
           </p>
         </section>
       )}
@@ -454,7 +486,7 @@ function OfficerScanPage() {
         <div className="rounded-2xl border border-slate-200 bg-white p-12 text-center shadow-sm">
           <Loader2 className="mx-auto h-8 w-8 animate-spin text-blue-600" />
           <p className="mt-3 font-medium text-slate-700">Hệ thống AI đang phân tích biển số...</p>
-          <p className="mt-1 text-sm text-slate-400">Roboflow: detect biển số · OCR ký tự</p>
+          <p className="mt-1 text-sm text-slate-400">AI service nội bộ: detect_plate.pt · read_characters.pt</p>
         </div>
       )}
 

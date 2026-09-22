@@ -1,19 +1,67 @@
-# Dependencies
+# ─── Node.js ──────────────────────────────────────────────────────────────────
 node_modules/
+backend/node_modules/
+frontend/node_modules/
 
-# Build output
+# ─── Build output ─────────────────────────────────────────────────────────────
 dist/
 build/
+**/dist/
+**/build/
 
-# Vite
+# ─── Vite ─────────────────────────────────────────────────────────────────────
 .vite/
+frontend/.vite/
 
-# TanStack
+# ─── TanStack Router (auto-generated, sẽ được gen lại khi chạy dev) ───────────
 .tanstack/
+frontend/.tanstack/
 
-# Environment
+# ─── Environment variables (chứa secret) ─────────────────────────────────────
 .env
 .env.*
+!.env.example
 
-# Logs
+# ─── Python / AI service ──────────────────────────────────────────────────────
+ai-service/venv/
+ai-service/__pycache__/
+**/__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+
+# Model files (nặng, quản lý riêng bằng Git LFS hoặc tải thủ công)
+ai-service/models/*.pt
+ai-service/models/*.onnx
+ai-service/models/*.bin
+
+# File kết quả training (nặng)
+ai-service/*.zip
+
+# ─── Backend ──────────────────────────────────────────────────────────────────
+# File Tesseract OCR data (dependency, không phải source code)
+backend/eng.traineddata
+backend/*.traineddata
+
+# ─── Logs ─────────────────────────────────────────────────────────────────────
 *.log
+logs/
+**/logs/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# ─── OS / Editor ──────────────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+.vscode/settings.json
+.idea/
+*.suo
+*.user
+
+# ─── Misc ─────────────────────────────────────────────────────────────────────
+*.tmp
+*.swp
+coverage/
+.nyc_output/

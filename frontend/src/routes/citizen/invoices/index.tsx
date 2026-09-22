@@ -1,4 +1,4 @@
-import { createFileRoute } from '@tanstack/react-router'
+import { createFileRoute, Link } from '@tanstack/react-router'
 import { useEffect, useMemo, useState } from 'react'
 import { CircleDollarSign, FileText, TriangleAlert } from 'lucide-react'
 import { getCitizenDashboard } from '@/lib/api'
@@ -7,7 +7,7 @@ import type { Invoice, Violation } from '@/lib/types'
 import { VIOLATION_TYPE_LABEL } from '@/lib/types'
 import { EmptyState, InvoiceStatusBadge, PageHeader, StatCard } from '@/components/ui'
 
-export const Route = createFileRoute('/citizen/invoices')({
+export const Route = createFileRoute('/citizen/invoices/')({
   component: CitizenInvoices,
 })
 
@@ -146,9 +146,15 @@ function CitizenInvoices() {
                   {rows.map((i) => {
                     const vi = violations.find((v) => v.id === i.violationId)
                     return (
-                      <tr key={i.id} className="hover:bg-slate-50">
+                      <tr key={i.id} className="cursor-pointer hover:bg-slate-50">
                         <td className="px-4 py-3 font-mono font-semibold text-slate-900">
-                          {i.invoiceCode || i.id}
+                          <Link
+                            to="/citizen/invoices/$id"
+                            params={{ id: i.id }}
+                            className="text-blue-600 hover:underline"
+                          >
+                            {i.invoiceCode || i.id}
+                          </Link>
                         </td>
                         <td className="px-4 py-3 text-slate-600">
                           {vi ? VIOLATION_TYPE_LABEL[vi.violationType] : '—'}
@@ -172,17 +178,23 @@ function CitizenInvoices() {
             {/* Mobile */}
             <ul className="divide-y divide-slate-100 md:hidden">
               {rows.map((i) => (
-                <li key={i.id} className="space-y-1 p-4">
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="font-mono font-semibold text-slate-900">
-                      {i.invoiceCode || i.id}
-                    </span>
-                    <InvoiceStatusBadge status={i.effectiveStatus} />
-                  </div>
-                  <p className="text-base font-bold text-slate-900">{formatCurrency(i.amount)}</p>
-                  {i.dueDate && (
-                    <p className="text-xs text-slate-500">Hạn nộp: {formatDate(i.dueDate)}</p>
-                  )}
+                <li key={i.id}>
+                  <Link
+                    to="/citizen/invoices/$id"
+                    params={{ id: i.id }}
+                    className="block space-y-1 p-4 hover:bg-slate-50"
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="font-mono font-semibold text-slate-900">
+                        {i.invoiceCode || i.id}
+                      </span>
+                      <InvoiceStatusBadge status={i.effectiveStatus} />
+                    </div>
+                    <p className="text-base font-bold text-slate-900">{formatCurrency(i.amount)}</p>
+                    {i.dueDate && (
+                      <p className="text-xs text-slate-500">Hạn nộp: {formatDate(i.dueDate)}</p>
+                    )}
+                  </Link>
                 </li>
               ))}
             </ul>

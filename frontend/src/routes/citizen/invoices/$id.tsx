@@ -7,7 +7,7 @@ import type { Invoice, Violation } from '@/lib/types'
 import { VIOLATION_TYPE_LABEL } from '@/lib/types'
 import { EmptyState, InvoiceStatusBadge, PageHeader, ViolationStatusBadge } from '@/components/ui'
 
-export const Route = createFileRoute('/citizen/invoices_detail')({
+export const Route = createFileRoute('/citizen/invoices/$id')({
   component: InvoiceDetail,
 })
 
@@ -38,7 +38,7 @@ function InvoiceDetail() {
       }
     })()
     return () => { cancelled = true }
-  }, [])
+  }, [id])
 
   if (loading) return <p className="text-sm text-slate-500">Đang tải...</p>
   if (error) return <EmptyState title="Lỗi tải dữ liệu" description={error} />

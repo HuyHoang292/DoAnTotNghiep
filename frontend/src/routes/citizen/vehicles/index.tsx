@@ -6,7 +6,7 @@ import { formatDate } from '@/lib/format'
 import type { Vehicle, Violation } from '@/lib/types'
 import { EmptyState, PageHeader, PlateTag } from '@/components/ui'
 
-export const Route = createFileRoute('/citizen/vehicles')({
+export const Route = createFileRoute('/citizen/vehicles/')({
   component: CitizenVehicles,
 })
 
