@@ -1,4 +1,4 @@
-import { createFileRoute } from '@tanstack/react-router'
+import { createFileRoute, Link } from '@tanstack/react-router'
 import { Car, FileText, TriangleAlert, Wallet } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import { EmptyState, PageHeader, StatCard, ViolationStatusBadge } from '@/components/ui'
@@ -117,12 +117,15 @@ function CitizenDashboard() {
           value={vehicles.length}
           icon={<Car className="h-5 w-5" />}
         />
-        <StatCard
-          label="Vi phạm chưa xử lý"
-          value={openViolations.length}
-          tone="pending"
-          icon={<TriangleAlert className="h-5 w-5" />}
-        />
+        <Link to="/citizen/violations" className="block rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-500">
+          <StatCard
+            label="Vi phạm chưa xử lý"
+            value={openViolations.length}
+            tone="pending"
+            icon={<TriangleAlert className="h-5 w-5" />}
+            hint="Nhấn để xem chi tiết"
+          />
+        </Link>
         <StatCard
           label="Hóa đơn chưa nộp"
           value={unpaid.length}
@@ -139,8 +142,14 @@ function CitizenDashboard() {
 
       <div className="grid gap-4 xl:grid-cols-3">
         <section className="rounded-2xl border border-slate-200 bg-white shadow-sm xl:col-span-2">
-          <div className="border-b border-slate-100 px-4 py-3">
+          <div className="flex items-center justify-between border-b border-slate-100 px-4 py-3">
             <h2 className="font-semibold text-slate-900">Vi phạm gần đây</h2>
+            <Link
+              to="/citizen/violations"
+              className="text-sm font-medium text-blue-600 hover:underline"
+            >
+              Xem tất cả →
+            </Link>
           </div>
           {violations.length === 0 ? (
             <EmptyState
@@ -153,40 +162,56 @@ function CitizenDashboard() {
                 const veh = vehicles.find((x) => x.id === v.vehicleId)
                 const overdue = overdueViolationIds.has(v.id)
                 return (
-                  <li key={v.id} className="flex gap-3 p-3">
-                    <img
-                      src={v.evidenceImageUrl}
-                      alt={`Ảnh chứng cứ ${v.id}`}
-                      className="h-16 w-16 shrink-0 rounded-lg bg-slate-100 object-cover"
-                    />
-                    <div className="min-w-0 flex-1">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <span className="plate">{veh?.licensePlate || v.licensePlate}</span>
-                        <ViolationStatusBadge status={v.status} />
-                        {overdue ? (
-                          <span className="inline-flex items-center rounded-full bg-red-100 px-2 py-0.5 text-xs font-medium text-red-700">
-                            Quá hạn
-                          </span>
+                  <li key={v.id}>
+                    <Link
+                      to="/citizen/violations/$id"
+                      params={{ id: v.id }}
+                      className="flex gap-3 p-3 hover:bg-slate-50"
+                    >
+                      <img
+                        src={v.evidenceImageUrl}
+                        alt={`Ảnh chứng cứ ${v.id}`}
+                        className="h-16 w-16 shrink-0 rounded-lg bg-slate-100 object-cover"
+                      />
+                      <div className="min-w-0 flex-1">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="plate">{veh?.licensePlate || v.licensePlate}</span>
+                          <ViolationStatusBadge status={v.status} />
+                          {overdue ? (
+                            <span className="inline-flex items-center rounded-full bg-red-100 px-2 py-0.5 text-xs font-medium text-red-700">
+                              Quá hạn
+                            </span>
+                          ) : null}
+                        </div>
+                        <p className="mt-1 truncate text-sm font-medium">
+                          {VIOLATION_TYPE_LABEL[v.violationType] || v.violationType}
+                        </p>
+                        <p className="truncate text-xs text-slate-500">
+                          {formatDateTime(v.detectedAt)}
+                          {v.cameraLocation ? ` · ${v.cameraLocation}` : ''}
+                        </p>
+                        {v.dueDate ? (
+                          <p className={`text-xs ${overdue ? 'font-semibold text-red-700' : 'text-amber-700'}`}>
+                            Hạn xử lý: {formatDate(v.dueDate)}
+                            {overdue ? ' (đã quá hạn)' : ''}
+                          </p>
                         ) : null}
                       </div>
-                      <p className="mt-1 truncate text-sm font-medium">
-                        {VIOLATION_TYPE_LABEL[v.violationType] || v.violationType}
-                      </p>
-                      <p className="truncate text-xs text-slate-500">
-                        {formatDateTime(v.detectedAt)}
-                        {v.cameraLocation ? ` · ${v.cameraLocation}` : ''}
-                      </p>
-                      {v.dueDate ? (
-                        <p className={`text-xs ${overdue ? 'font-semibold text-red-700' : 'text-amber-700'}`}>
-                          Hạn xử lý: {formatDate(v.dueDate)}
-                          {overdue ? ' (đã quá hạn)' : ''}
-                        </p>
-                      ) : null}
-                    </div>
+                    </Link>
                   </li>
                 )
               })}
             </ul>
+          )}
+          {violations.length > 5 && (
+            <div className="border-t border-slate-100 px-4 py-3 text-center">
+              <Link
+                to="/citizen/violations"
+                className="text-sm font-medium text-blue-600 hover:underline"
+              >
+                Xem thêm {violations.length - 5} vi phạm khác →
+              </Link>
+            </div>
           )}
         </section>
 

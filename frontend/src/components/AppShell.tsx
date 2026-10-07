@@ -22,10 +22,11 @@ import { cn } from '@/lib/cn'
 type Role = 'CITIZEN' | 'OFFICER' | 'ADMIN'
 
 const citizenNav = [
-  { to: '/citizen/dashboard', label: 'Trang chủ', icon: LayoutDashboard },
-  { to: '/citizen/profile',   label: 'Hồ sơ cá nhân', icon: UserIcon },
-  { to: '/citizen/vehicles',  label: 'Phương tiện', icon: Car },
-  { to: '/citizen/invoices',  label: 'Hóa đơn', icon: FileText },
+  { to: '/citizen/dashboard',  label: 'Trang chủ',    icon: LayoutDashboard },
+  { to: '/citizen/profile',    label: 'Hồ sơ cá nhân', icon: UserIcon },
+  { to: '/citizen/vehicles',   label: 'Phương tiện',  icon: Car },
+  { to: '/citizen/violations', label: 'Vi phạm',      icon: TriangleAlert },
+  { to: '/citizen/invoices',   label: 'Hóa đơn',      icon: FileText },
 ]
 
 const officerNav = [
