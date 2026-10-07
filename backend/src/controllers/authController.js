@@ -73,10 +73,44 @@ exports.getMe = async (req, res) => {
         phone: user.phone,
         role: user.role,
         badgeNumber: user.badge_number,
-        unit: user.role === 'OFFICER' ? 'Phòng CSGT' : undefined
+        unit: user.role === 'OFFICER' ? 'Phòng CSGT' : undefined,
+        gender: user.gender ?? null,
+        address: user.address ?? null,
+        ward: user.ward ?? null,
+        city: user.city ?? null,
+        province: user.province ?? null,
       }
     });
   } catch (error) {
     return res.status(500).json({ message: 'Lỗi lấy thông tin người dùng.' });
+  }
+};
+
+exports.changePassword = async (req, res) => {
+  try {
+    const { oldPassword, newPassword } = req.body;
+
+    if (!oldPassword || !newPassword) {
+      return res.status(400).json({ message: 'Vui lòng nhập đầy đủ thông tin.' });
+    }
+    if (newPassword.length < 6) {
+      return res.status(400).json({ message: 'Mật khẩu mới tối thiểu 6 ký tự.' });
+    }
+
+    const user = await db('users').where('id', req.user.id).first();
+    if (!user) return res.status(404).json({ message: 'Không tìm thấy người dùng.' });
+
+    const isMatch = await bcrypt.compare(oldPassword, user.password_hash);
+    if (!isMatch) {
+      return res.status(401).json({ message: 'Mật khẩu hiện tại không đúng.' });
+    }
+
+    const hashed = await bcrypt.hash(newPassword, 12);
+    await db('users').where('id', req.user.id).update({ password_hash: hashed });
+
+    return res.json({ message: 'Đổi mật khẩu thành công.' });
+  } catch (error) {
+    console.error('ChangePassword Error:', error);
+    return res.status(500).json({ message: 'Lỗi máy chủ nội bộ.' });
   }
 };

@@ -13,6 +13,11 @@ export type AuthUser = {
   role: 'CITIZEN' | 'OFFICER' | 'ADMIN'
   badgeNumber?: string | null
   unit?: string
+  gender?: 'MALE' | 'FEMALE' | 'OTHER' | null
+  address?: string | null
+  ward?: string | null
+  city?: string | null
+  province?: string | null
 }
 
 export function getToken(): string | null {
@@ -73,6 +78,13 @@ export async function loginRequest(username: string, password: string) {
 
 export async function getMeRequest() {
   return apiFetch<{ user: AuthUser }>('/api/auth/me')
+}
+
+export async function changePasswordRequest(oldPassword: string, newPassword: string) {
+  return apiFetch<{ message: string }>('/api/auth/change-password', {
+    method: 'PATCH',
+    body: JSON.stringify({ oldPassword, newPassword }),
+  })
 }
 
 export async function getCitizenDashboard() {

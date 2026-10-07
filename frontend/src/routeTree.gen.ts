@@ -11,6 +11,7 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as CitizenRouteImport } from './routes/citizen'
+import { Route as Forgot_passwordRouteImport } from './routes/forgot_password'
 import { Route as OfficerRouteImport } from './routes/officer'
 import { Route as CitizenIndexRouteImport } from './routes/citizen/index'
 import { Route as CitizenDashboardRouteImport } from './routes/citizen/dashboard'
@@ -24,6 +25,8 @@ import { Route as CitizenInvoicesIndexRouteImport } from './routes/citizen/invoi
 import { Route as CitizenInvoicesIdRouteImport } from './routes/citizen/invoices/$id'
 import { Route as CitizenVehiclesIndexRouteImport } from './routes/citizen/vehicles/index'
 import { Route as CitizenVehiclesIdRouteImport } from './routes/citizen/vehicles/$id'
+import { Route as CitizenViolationsIndexRouteImport } from './routes/citizen/violations/index'
+import { Route as CitizenViolationsIdRouteImport } from './routes/citizen/violations/$id'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -33,6 +36,11 @@ const IndexRoute = IndexRouteImport.update({
 const CitizenRoute = CitizenRouteImport.update({
   id: '/citizen',
   path: '/citizen',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const Forgot_passwordRoute = Forgot_passwordRouteImport.update({
+  id: '/forgot_password',
+  path: '/forgot_password',
   getParentRoute: () => rootRouteImport,
 } as any)
 const OfficerRoute = OfficerRouteImport.update({
@@ -100,10 +108,21 @@ const CitizenVehiclesIdRoute = CitizenVehiclesIdRouteImport.update({
   path: '/vehicles/$id',
   getParentRoute: () => CitizenRoute,
 } as any)
+const CitizenViolationsIndexRoute = CitizenViolationsIndexRouteImport.update({
+  id: '/violations/',
+  path: '/violations/',
+  getParentRoute: () => CitizenRoute,
+} as any)
+const CitizenViolationsIdRoute = CitizenViolationsIdRouteImport.update({
+  id: '/violations/$id',
+  path: '/violations/$id',
+  getParentRoute: () => CitizenRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/citizen': typeof CitizenRouteWithChildren
+  '/forgot_password': typeof Forgot_passwordRoute
   '/officer': typeof OfficerRouteWithChildren
   '/citizen/dashboard': typeof CitizenDashboardRoute
   '/citizen/profile': typeof CitizenProfileRoute
@@ -115,11 +134,14 @@ export interface FileRoutesByFullPath {
   '/officer/': typeof OfficerIndexRoute
   '/citizen/invoices/$id': typeof CitizenInvoicesIdRoute
   '/citizen/vehicles/$id': typeof CitizenVehiclesIdRoute
+  '/citizen/violations/$id': typeof CitizenViolationsIdRoute
   '/citizen/invoices/': typeof CitizenInvoicesIndexRoute
   '/citizen/vehicles/': typeof CitizenVehiclesIndexRoute
+  '/citizen/violations/': typeof CitizenViolationsIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/forgot_password': typeof Forgot_passwordRoute
   '/citizen/dashboard': typeof CitizenDashboardRoute
   '/citizen/profile': typeof CitizenProfileRoute
   '/officer/citizens': typeof OfficerCitizensRoute
@@ -130,13 +152,16 @@ export interface FileRoutesByTo {
   '/officer': typeof OfficerIndexRoute
   '/citizen/invoices/$id': typeof CitizenInvoicesIdRoute
   '/citizen/vehicles/$id': typeof CitizenVehiclesIdRoute
+  '/citizen/violations/$id': typeof CitizenViolationsIdRoute
   '/citizen/invoices': typeof CitizenInvoicesIndexRoute
   '/citizen/vehicles': typeof CitizenVehiclesIndexRoute
+  '/citizen/violations': typeof CitizenViolationsIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/citizen': typeof CitizenRouteWithChildren
+  '/forgot_password': typeof Forgot_passwordRoute
   '/officer': typeof OfficerRouteWithChildren
   '/citizen/dashboard': typeof CitizenDashboardRoute
   '/citizen/profile': typeof CitizenProfileRoute
@@ -148,14 +173,17 @@ export interface FileRoutesById {
   '/officer/': typeof OfficerIndexRoute
   '/citizen/invoices/$id': typeof CitizenInvoicesIdRoute
   '/citizen/vehicles/$id': typeof CitizenVehiclesIdRoute
+  '/citizen/violations/$id': typeof CitizenViolationsIdRoute
   '/citizen/invoices/': typeof CitizenInvoicesIndexRoute
   '/citizen/vehicles/': typeof CitizenVehiclesIndexRoute
+  '/citizen/violations/': typeof CitizenViolationsIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
     | '/citizen'
+    | '/forgot_password'
     | '/officer'
     | '/citizen/dashboard'
     | '/citizen/profile'
@@ -167,11 +195,14 @@ export interface FileRouteTypes {
     | '/officer/'
     | '/citizen/invoices/$id'
     | '/citizen/vehicles/$id'
+    | '/citizen/violations/$id'
     | '/citizen/invoices/'
     | '/citizen/vehicles/'
+    | '/citizen/violations/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/forgot_password'
     | '/citizen/dashboard'
     | '/citizen/profile'
     | '/officer/citizens'
@@ -182,12 +213,15 @@ export interface FileRouteTypes {
     | '/officer'
     | '/citizen/invoices/$id'
     | '/citizen/vehicles/$id'
+    | '/citizen/violations/$id'
     | '/citizen/invoices'
     | '/citizen/vehicles'
+    | '/citizen/violations'
   id:
     | '__root__'
     | '/'
     | '/citizen'
+    | '/forgot_password'
     | '/officer'
     | '/citizen/dashboard'
     | '/citizen/profile'
@@ -199,13 +233,16 @@ export interface FileRouteTypes {
     | '/officer/'
     | '/citizen/invoices/$id'
     | '/citizen/vehicles/$id'
+    | '/citizen/violations/$id'
     | '/citizen/invoices/'
     | '/citizen/vehicles/'
+    | '/citizen/violations/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   CitizenRoute: typeof CitizenRouteWithChildren
+  Forgot_passwordRoute: typeof Forgot_passwordRoute
   OfficerRoute: typeof OfficerRouteWithChildren
 }
 
@@ -223,6 +260,13 @@ declare module '@tanstack/react-router' {
       path: '/citizen'
       fullPath: '/citizen'
       preLoaderRoute: typeof CitizenRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/forgot_password': {
+      id: '/forgot_password'
+      path: '/forgot_password'
+      fullPath: '/forgot_password'
+      preLoaderRoute: typeof Forgot_passwordRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/officer': {
@@ -316,6 +360,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof CitizenVehiclesIdRouteImport
       parentRoute: typeof CitizenRoute
     }
+    '/citizen/violations/': {
+      id: '/citizen/violations/'
+      path: '/violations'
+      fullPath: '/citizen/violations/'
+      preLoaderRoute: typeof CitizenViolationsIndexRouteImport
+      parentRoute: typeof CitizenRoute
+    }
+    '/citizen/violations/$id': {
+      id: '/citizen/violations/$id'
+      path: '/violations/$id'
+      fullPath: '/citizen/violations/$id'
+      preLoaderRoute: typeof CitizenViolationsIdRouteImport
+      parentRoute: typeof CitizenRoute
+    }
   }
 }
 
@@ -325,8 +383,10 @@ interface CitizenRouteChildren {
   CitizenIndexRoute: typeof CitizenIndexRoute
   CitizenInvoicesIdRoute: typeof CitizenInvoicesIdRoute
   CitizenVehiclesIdRoute: typeof CitizenVehiclesIdRoute
+  CitizenViolationsIdRoute: typeof CitizenViolationsIdRoute
   CitizenInvoicesIndexRoute: typeof CitizenInvoicesIndexRoute
   CitizenVehiclesIndexRoute: typeof CitizenVehiclesIndexRoute
+  CitizenViolationsIndexRoute: typeof CitizenViolationsIndexRoute
 }
 
 const CitizenRouteChildren: CitizenRouteChildren = {
@@ -335,8 +395,10 @@ const CitizenRouteChildren: CitizenRouteChildren = {
   CitizenIndexRoute: CitizenIndexRoute,
   CitizenInvoicesIdRoute: CitizenInvoicesIdRoute,
   CitizenVehiclesIdRoute: CitizenVehiclesIdRoute,
+  CitizenViolationsIdRoute: CitizenViolationsIdRoute,
   CitizenInvoicesIndexRoute: CitizenInvoicesIndexRoute,
   CitizenVehiclesIndexRoute: CitizenVehiclesIndexRoute,
+  CitizenViolationsIndexRoute: CitizenViolationsIndexRoute,
 }
 
 const CitizenRouteWithChildren =
@@ -364,6 +426,7 @@ const OfficerRouteWithChildren =
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   CitizenRoute: CitizenRouteWithChildren,
+  Forgot_passwordRoute: Forgot_passwordRoute,
   OfficerRoute: OfficerRouteWithChildren,
 }
 export const routeTree = rootRouteImport
