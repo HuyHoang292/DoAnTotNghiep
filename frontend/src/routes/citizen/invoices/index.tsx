@@ -60,7 +60,10 @@ function CitizenInvoices() {
     [invoices],
   )
 
-  const unpaid = enriched.filter((i) => i.status === 'UNPAID')
+  // Chưa thanh toán = UNPAID + OVERDUE (cả 2 đều còn nợ tiền)
+  const unpaid = enriched.filter(
+    (i) => i.effectiveStatus === 'UNPAID' || i.effectiveStatus === 'OVERDUE',
+  )
   const overdue = enriched.filter((i) => i.effectiveStatus === 'OVERDUE')
   const totalDue = unpaid.reduce((s, i) => s + i.amount, 0)
 
@@ -91,7 +94,7 @@ function CitizenInvoices() {
           label="Chưa thanh toán"
           value={unpaid.length}
           icon={<FileText className="h-5 w-5" />}
-          tone="pending"
+          tone ="pending"
         />
         <StatCard
           label="Quá hạn nộp"

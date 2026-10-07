@@ -1,6 +1,8 @@
 import type { Camera, Invoice, Vehicle, VehicleOwner, Violation } from './types'
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000'
+// Khi có VITE_API_URL (production/docker) thì dùng URL tuyệt đối.
+// Khi dev (localhost), để trống → dùng path tương đối → đi qua Vite proxy → tránh CORS.
+const API_BASE_URL = import.meta.env.VITE_API_URL ?? ''
 
 export type AuthUser = {
   id: string
