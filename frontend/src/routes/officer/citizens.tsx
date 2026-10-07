@@ -26,6 +26,7 @@ function OfficerCitizens() {
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
   const [q, setQ] = useState('')
+  const [searchField, setSearchField] = useState<'all' | 'fullName' | 'nationalId' | 'phone' | 'email'>('all')
   const [page, setPage] = useState(1)
   const [viewing, setViewing] = useState<VehicleOwner | null>(null)
   const [editing, setEditing] = useState<VehicleOwner | null>(null)
@@ -55,15 +56,35 @@ function OfficerCitizens() {
     }
   }, [])
 
-  const filtered = useMemo(
-    () =>
-      citizens.filter((c) =>
-        `${c.fullName} ${c.nationalId} ${c.phone} ${c.email ?? ''}`
-          .toLowerCase()
-          .includes(q.trim().toLowerCase()),
-      ),
-    [citizens, q],
-  )
+  const filtered = useMemo(() => {
+    const keyword = q.trim().toLowerCase()
+    if (!keyword) return citizens
+
+    return citizens.filter((c) => {
+      const fullName = (c.fullName || '').toLowerCase()
+      const nationalId = (c.nationalId || '').toLowerCase()
+      const phone = (c.phone || '').toLowerCase()
+      const email = (c.email || '').toLowerCase()
+
+      switch (searchField) {
+        case 'fullName':
+          return fullName.includes(keyword)
+        case 'nationalId':
+          return nationalId.includes(keyword)
+        case 'phone':
+          return phone.includes(keyword)
+        case 'email':
+          return email.includes(keyword)
+        default:
+          return (
+            fullName.includes(keyword) ||
+            nationalId.includes(keyword) ||
+            phone.includes(keyword) ||
+            email.includes(keyword)
+          )
+      }
+    })
+  }, [citizens, q, searchField])
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE))
   const safePage = Math.min(page, totalPages)
@@ -76,7 +97,7 @@ function OfficerCitizens() {
     <>
       <PageHeader
         title="Quản lý công dân"
-        description="Đăng ký tài khoản công dân, cập nhật liên hệ và xem chi tiết ngay trên trang này."
+        description="Đăng ký tài khoản công dân, cập nhật liên hệ, địa chỉ và xem chi tiết ngay trên trang này."
         actions={
           <button
             type="button"
@@ -125,28 +146,56 @@ function OfficerCitizens() {
         />
       </div>
 
-      <div className="flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-2 shadow-sm">
-        <Search className="h-4 w-4 shrink-0 text-slate-400" />
-        <input
-          value={q}
-          onChange={(e) => {
-            setQ(e.target.value)
-            setPage(1)
-          }}
-          placeholder="Tìm theo họ tên, CCCD, số điện thoại, email..."
-          className="flex-1 bg-transparent py-1 text-sm outline-none placeholder:text-slate-400"
-        />
-        {q && (
-          <button
-            type="button"
-            onClick={() => {
-              setQ('')
+      <div className="flex flex-col gap-2 rounded-2xl border border-slate-200 bg-white p-3 shadow-sm sm:flex-row sm:items-center">
+        <div className="flex flex-1 items-center gap-2 px-2">
+          <Search className="h-4 w-4 shrink-0 text-slate-400" />
+          <input
+            value={q}
+            onChange={(e) => {
+              setQ(e.target.value)
               setPage(1)
             }}
+            placeholder={
+              searchField === 'fullName'
+                ? 'Nhập họ tên cần tìm...'
+                : searchField === 'nationalId'
+                ? 'Nhập số CCCD cần tìm...'
+                : searchField === 'phone'
+                ? 'Nhập số điện thoại cần tìm...'
+                : searchField === 'email'
+                ? 'Nhập gmail (xxx@gmail.com)...'
+                : 'Tìm theo họ tên, CCCD, số điện thoại, email...'
+            }
+            className="flex-1 bg-transparent py-1 text-sm outline-none placeholder:text-slate-400"
+          />
+          {q && (
+            <button
+              type="button"
+              onClick={() => {
+                setQ('')
+                setPage(1)
+              }}
+            >
+              <X className="h-4 w-4 text-slate-400 hover:text-slate-600" />
+            </button>
+          )}
+        </div>
+        <div className="flex items-center gap-2 border-t border-slate-100 pt-2 sm:border-t-0 sm:border-l sm:pl-3 sm:pt-0">
+          <select
+            value={searchField}
+            onChange={(e) => {
+              setSearchField(e.target.value as any)
+              setPage(1)
+            }}
+            className="h-9 rounded-xl border border-slate-200 bg-slate-50 px-3 text-xs font-medium text-slate-600 outline-none focus:border-blue-500"
           >
-            <X className="h-4 w-4 text-slate-400 hover:text-slate-600" />
-          </button>
-        )}
+            <option value="all">Tất cả trường</option>
+            <option value="fullName">Họ tên</option>
+            <option value="nationalId">CCCD</option>
+            <option value="phone">Số điện thoại</option>
+            <option value="email">Gmail</option>
+          </select>
+        </div>
       </div>
 
       <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
@@ -161,17 +210,19 @@ function OfficerCitizens() {
                     <th className="px-4 py-3 text-left">Họ tên</th>
                     <th className="px-4 py-3 text-left">CCCD</th>
                     <th className="px-4 py-3 text-left">Liên hệ</th>
+                    <th className="px-4 py-3 text-left">Địa chỉ</th>
                     <th className="px-4 py-3 text-right">Xe</th>
                     <th className="px-4 py-3 text-right">Vi phạm</th>
                     <th className="px-4 py-3 text-right">Thao tác</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
-                  {rows.map((c) => {
+                  {rows.map((c: any) => {
                     const owned = vehicles.filter((v) => v.ownerId === c.id)
                     const vioCount = violations.filter((v) =>
                       owned.some((o) => o.id === v.vehicleId),
                     ).length
+                    const shortAddress = [c.ward, c.city].filter(Boolean).join(', ')
                     return (
                       <tr
                         key={c.id}
@@ -185,6 +236,9 @@ function OfficerCitizens() {
                           {c.email && (
                             <span className="block text-xs text-slate-400">{c.email}</span>
                           )}
+                        </td>
+                        <td className="px-4 py-3 text-slate-600">
+                          {shortAddress || c.address || '—'}
                         </td>
                         <td className="px-4 py-3 text-right">{owned.length}</td>
                         <td className="px-4 py-3 text-right font-semibold">
@@ -278,7 +332,7 @@ function OfficerCitizens() {
       {editing && (
         <CitizenFormModal
           title="Chỉnh sửa công dân"
-          description="Chỉ cập nhật các ô có nội dung. Ô để trống sẽ giữ nguyên dữ liệu cũ."
+          description="Cập nhật thông tin chi tiết và địa chỉ của công dân."
           citizen={editing}
           onClose={() => setEditing(null)}
           onSubmit={async (payload) => {
@@ -301,7 +355,13 @@ function CitizenDetailModal({
   onClose,
   onEdit,
 }: {
-  citizen: VehicleOwner
+  citizen: VehicleOwner & {
+    gender?: string
+    address?: string
+    ward?: string
+    city?: string
+    province?: string
+  }
   vehicles: Vehicle[]
   violations: Violation[]
   onClose: () => void
@@ -310,13 +370,25 @@ function CitizenDetailModal({
   const owned = vehicles.filter((v) => v.ownerId === citizen.id)
   const ownedVios = violations.filter((v) => owned.some((o) => o.id === v.vehicleId))
 
+  const formatGender = (g?: string) => {
+    if (g === 'MALE') return 'Nam'
+    if (g === 'FEMALE') return 'Nữ'
+    return 'Khác'
+  }
+
+  const fullAddress = [citizen.address, citizen.ward, citizen.city, citizen.province]
+    .filter(Boolean)
+    .join(', ')
+
   return (
     <Modal title="Thông tin công dân" onClose={onClose}>
       <dl className="grid gap-3 text-sm sm:grid-cols-2">
         <InfoRow label="Họ và tên" value={citizen.fullName} />
         <InfoRow label="Số CCCD" value={citizen.nationalId} />
         <InfoRow label="Điện thoại" value={citizen.phone} />
+        <InfoRow label="Giới tính" value={formatGender(citizen.gender)} />
         <InfoRow label="Email" value={citizen.email ?? '—'} />
+        <InfoRow label="Địa chỉ đầy đủ" value={fullAddress || '—'} />
         <InfoRow label="Vai trò" value={citizen.role || 'CITIZEN'} />
         <InfoRow label="Trạng thái" value={citizen.status || 'ACTIVE'} />
         <InfoRow
@@ -397,20 +469,37 @@ function CitizenFormModal({
 }: {
   title: string
   description: string
-  citizen?: VehicleOwner
+  citizen?: VehicleOwner & {
+    gender?: string
+    address?: string
+    ward?: string
+    city?: string
+    province?: string
+  }
   onClose: () => void
   onSubmit: (payload: {
     fullName: string
     nationalId: string
     email: string
     phone: string
+    gender: string
+    address: string
+    ward: string
+    city: string
+    province: string
   }) => Promise<void>
 }) {
   const isEdit = Boolean(citizen)
-  const [fullName, setFullName] = useState(isEdit ? '' : '')
-  const [nationalId, setNationalId] = useState('')
+  const [fullName, setFullName] = useState(citizen?.fullName ?? '')
+  const [nationalId, setNationalId] = useState(citizen?.nationalId ?? '')
   const [email, setEmail] = useState(citizen?.email ?? '')
   const [phone, setPhone] = useState(citizen?.phone ?? '')
+  const [gender, setGender] = useState(citizen?.gender ?? 'MALE')
+  const [address, setAddress] = useState(citizen?.address ?? '')
+  const [ward, setWard] = useState(citizen?.ward ?? '')
+  const [city, setCity] = useState(citizen?.city ?? '')
+  const [province, setProvince] = useState(citizen?.province ?? '')
+
   const [saving, setSaving] = useState(false)
   const [formError, setFormError] = useState('')
 
@@ -421,17 +510,47 @@ function CitizenFormModal({
         onSubmit={async (e) => {
           e.preventDefault()
           setFormError('')
-          if (!isEdit && (!fullName.trim() || !nationalId.trim() || !email.trim() || !phone.trim())) {
-            setFormError('Vui lòng nhập đầy đủ họ tên, CCCD, email và số điện thoại.')
+
+          // Kiểm tra các trường bắt buộc
+          if (
+            !fullName.trim() ||
+            !nationalId.trim() ||
+            !phone.trim() ||
+            !address.trim() ||
+            !ward.trim() ||
+            !city.trim() ||
+            !province.trim()
+          ) {
+            setFormError('Vui lòng điền đầy đủ các trường bắt buộc (*).')
             return
           }
+
+          // Ràng buộc CCCD đủ ký tự (chuẩn 12 chữ số)
+          const cleanNationalId = nationalId.trim()
+          if (!/^\d{12}$/.test(cleanNationalId)) {
+            setFormError('Số CCCD phải bao gồm đúng 12 chữ số.')
+            return
+          }
+
+          // Ràng buộc định dạng Gmail nếu có nhập
+          const cleanEmail = email.trim()
+          if (cleanEmail && !/^[\w.-]+@gmail\.com$/i.test(cleanEmail)) {
+            setFormError('Email phải có định dạng chuẩn xxx@gmail.com')
+            return
+          }
+
           setSaving(true)
           try {
             await onSubmit({
               fullName: fullName.trim(),
-              nationalId: nationalId.trim(),
-              email: email.trim(),
+              nationalId: cleanNationalId,
+              email: cleanEmail,
               phone: phone.trim(),
+              gender,
+              address: address.trim(),
+              ward: ward.trim(),
+              city: city.trim(),
+              province: province.trim(),
             })
           } catch (err) {
             setFormError(err instanceof Error ? err.message : 'Không lưu được thông tin.')
@@ -440,39 +559,87 @@ function CitizenFormModal({
           }
         }}
       >
-        <Field label={isEdit ? 'Họ tên (để trống nếu không đổi)' : 'Họ và tên'}>
+        <Field label="Họ và tên *">
           <input
             className={inputClass}
             value={fullName}
             onChange={(e) => setFullName(e.target.value)}
-            placeholder={citizen?.fullName || 'Nguyễn Văn A'}
+            placeholder="Nguyễn Văn A"
           />
         </Field>
-        <Field label={isEdit ? 'CCCD (để trống nếu không đổi)' : 'Số CCCD'}>
+        <Field label="Số CCCD * (Đủ 12 chữ số)">
           <input
             className={inputClass}
+            maxLength={12}
             value={nationalId}
-            onChange={(e) => setNationalId(e.target.value)}
-            placeholder={citizen?.nationalId || '0010xxxxxxxx'}
+            onChange={(e) => setNationalId(e.target.value.replace(/\D/g, ''))}
+            placeholder="0010xxxxxxxx"
           />
         </Field>
-        <Field label="Email / Gmail">
+        <div className="grid grid-cols-2 gap-2">
+          <Field label="Số điện thoại *">
+            <input
+              className={inputClass}
+              value={phone}
+              onChange={(e) => setPhone(e.target.value)}
+              placeholder="09xxxxxxxx"
+            />
+          </Field>
+          <Field label="Giới tính *">
+            <select
+              className={inputClass}
+              value={gender}
+              onChange={(e) => setGender(e.target.value)}
+            >
+              <option value="MALE">Nam</option>
+              <option value="FEMALE">Nữ</option>
+              <option value="OTHER">Khác</option>
+            </select>
+          </Field>
+        </div>
+        <Field label="Email / Gmail (xxx@gmail.com)">
           <input
             type="email"
             className={inputClass}
             value={email}
             onChange={(e) => setEmail(e.target.value)}
-            placeholder="email@gmail.com"
+            placeholder="example@gmail.com"
           />
         </Field>
-        <Field label="Số điện thoại">
+        <Field label="Địa chỉ (Số nhà, tên đường) *">
           <input
             className={inputClass}
-            value={phone}
-            onChange={(e) => setPhone(e.target.value)}
-            placeholder="09xxxxxxxx"
+            value={address}
+            onChange={(e) => setAddress(e.target.value)}
+            placeholder="Số 123, Đường ABC"
           />
         </Field>
+        <div className="grid grid-cols-3 gap-2">
+          <Field label="Phường / Xã *">
+            <input
+              className={inputClass}
+              value={ward}
+              onChange={(e) => setWard(e.target.value)}
+              placeholder="Phường X"
+            />
+          </Field>
+          <Field label="Thành phố / Huyện *">
+            <input
+              className={inputClass}
+              value={city}
+              onChange={(e) => setCity(e.target.value)}
+              placeholder="Quận Y"
+            />
+          </Field>
+          <Field label="Tỉnh / Thành phố *">
+            <input
+              className={inputClass}
+              value={province}
+              onChange={(e) => setProvince(e.target.value)}
+              placeholder="Hà Nội"
+            />
+          </Field>
+        </div>
 
         {formError && <p className="text-sm text-red-600">{formError}</p>}
 

@@ -43,6 +43,7 @@ function OfficerVehicles() {
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
   const [q, setQ] = useState('')
+  const [searchField, setSearchField] = useState<'all' | 'ownerName' | 'licensePlate' | 'ownerNationalId'>('all')
   const [typeFilter, setTypeFilter] = useState('all')
   const [page, setPage] = useState(1)
   const [viewing, setViewing] = useState<Vehicle | null>(null)
@@ -78,16 +79,37 @@ function OfficerVehicles() {
     }
   }, [])
 
-  const filtered = useMemo(
-    () =>
-      vehicles
-        .filter((v) => {
-          const key = `${v.licensePlate} ${v.brand} ${v.model} ${v.color} ${v.ownerName ?? ''}`
-          return key.toLowerCase().includes(q.trim().toLowerCase())
-        })
-        .filter((v) => typeFilter === 'all' || v.vehicleType === typeFilter),
-    [vehicles, q, typeFilter],
-  )
+  const filtered = useMemo(() => {
+    const keyword = q.trim().toLowerCase()
+
+    return vehicles
+      .filter((v) => {
+        if (!keyword) return true
+
+        const ownerName = (v.ownerName ?? '').toLowerCase()
+        const licensePlate = (v.licensePlate ?? '').toLowerCase()
+        const ownerNationalId = (v.ownerNationalId ?? '').toLowerCase()
+        const brandModelColor = `${v.brand ?? ''} ${v.model ?? ''} ${v.color ?? ''}`.toLowerCase()
+
+        switch (searchField) {
+          case 'ownerName':
+            return ownerName.includes(keyword)
+          case 'licensePlate':
+            return licensePlate.includes(keyword)
+          case 'ownerNationalId':
+            return ownerNationalId.includes(keyword)
+          default:
+            // Tìm kiếm chung trên tất cả các trường quan trọng + thông tin xe
+            return (
+              ownerName.includes(keyword) ||
+              licensePlate.includes(keyword) ||
+              ownerNationalId.includes(keyword) ||
+              brandModelColor.includes(keyword)
+            )
+        }
+      })
+      .filter((v) => typeFilter === 'all' || v.vehicleType === typeFilter)
+  }, [vehicles, q, searchField, typeFilter])
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE))
   const safePage = Math.min(page, totalPages)
@@ -143,7 +165,7 @@ function OfficerVehicles() {
         <StatCard label="Xe có vi phạm" value={withVio} icon={<Car className="h-5 w-5" />} tone="danger" />
       </div>
 
-      <div className="flex flex-wrap gap-2 rounded-2xl border border-slate-200 bg-white p-3 shadow-sm">
+      <div className="flex flex-col gap-2 rounded-2xl border border-slate-200 bg-white p-3 shadow-sm sm:flex-row sm:items-center">
         <div className="flex flex-1 items-center gap-2 rounded-xl border border-slate-200 px-3 py-2">
           <Search className="h-4 w-4 shrink-0 text-slate-400" />
           <input
@@ -152,7 +174,15 @@ function OfficerVehicles() {
               setQ(e.target.value)
               setPage(1)
             }}
-            placeholder="Tìm biển số, hãng xe, màu sơn, chủ xe..."
+            placeholder={
+              searchField === 'ownerName'
+                ? 'Nhập tên chủ sở hữu cần tìm...'
+                : searchField === 'licensePlate'
+                ? 'Nhập biển số cần tìm...'
+                : searchField === 'ownerNationalId'
+                ? 'Nhập số CCCD chủ sở hữu cần tìm...'
+                : 'Tìm theo tên chủ xe, biển số, CCCD, hãng xe...'
+            }
             className="flex-1 bg-transparent text-sm outline-none placeholder:text-slate-400"
           />
           {q && (
@@ -167,6 +197,22 @@ function OfficerVehicles() {
             </button>
           )}
         </div>
+
+        {/* Thêm lựa chọn tiêu chí tìm kiếm */}
+        <select
+          value={searchField}
+          onChange={(e) => {
+            setSearchField(e.target.value as any)
+            setPage(1)
+          }}
+          className="h-10 rounded-xl border border-slate-200 bg-slate-50 px-3 text-xs font-medium text-slate-600 outline-none focus:border-blue-400"
+        >
+          <option value="all">Tất cả tiêu chí</option>
+          <option value="ownerName">Tên chủ sở hữu</option>
+          <option value="licensePlate">Biển số</option>
+          <option value="ownerNationalId">CCCD chủ sở hữu</option>
+        </select>
+
         <select
           value={typeFilter}
           onChange={(e) => {
@@ -221,8 +267,11 @@ function OfficerVehicles() {
                       <td className="px-4 py-3 text-slate-600">{v.color}</td>
                       <td className="px-4 py-3 text-slate-700">
                         {v.ownerName || '—'}
+                        {v.ownerNationalId && (
+                          <span className="block text-xs font-mono text-slate-500">CCCD: {v.ownerNationalId}</span>
+                        )}
                         {v.ownerPhone && (
-                          <span className="block text-xs text-slate-400">{v.ownerPhone}</span>
+                          <span className="block text-xs text-slate-400">SĐT: {v.ownerPhone}</span>
                         )}
                       </td>
                       <td className="px-4 py-3 whitespace-nowrap text-slate-600">
