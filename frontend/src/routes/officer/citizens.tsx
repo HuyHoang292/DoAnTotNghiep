@@ -155,17 +155,7 @@ function OfficerCitizens() {
               setQ(e.target.value)
               setPage(1)
             }}
-            placeholder={
-              searchField === 'fullName'
-                ? 'Nhập họ tên cần tìm...'
-                : searchField === 'nationalId'
-                ? 'Nhập số CCCD cần tìm...'
-                : searchField === 'phone'
-                ? 'Nhập số điện thoại cần tìm...'
-                : searchField === 'email'
-                ? 'Nhập gmail (xxx@gmail.com)...'
-                : 'Tìm theo họ tên, CCCD, số điện thoại, email...'
-            }
+            placeholder="Tìm theo họ tên, CCCD, số điện thoại, email..."
             className="flex-1 bg-transparent py-1 text-sm outline-none placeholder:text-slate-400"
           />
           {q && (
@@ -317,13 +307,13 @@ function OfficerCitizens() {
       {creating && (
         <CitizenFormModal
           title="Thêm công dân"
-          description="Tài khoản được tạo với vai trò CITIZEN. Mật khẩu tạm thời: 123456."
+          description="Tài khoản tạo mới sẽ tự động gửi email thông tin đăng nhập."
           onClose={() => setCreating(false)}
           onSubmit={async (payload) => {
             const res = await createCitizenRequest(payload)
             await load()
             setCreating(false)
-            setNotice(res.message || 'Đã thêm công dân.')
+            setNotice(res.message || 'Đã thêm công dân và gửi email thông báo tự động.')
             if (res.user) setViewing(res.user)
           }}
         />
@@ -356,6 +346,7 @@ function CitizenDetailModal({
   onEdit,
 }: {
   citizen: VehicleOwner & {
+    dateOfBirth?: string
     gender?: string
     address?: string
     ward?: string
@@ -376,6 +367,11 @@ function CitizenDetailModal({
     return 'Khác'
   }
 
+  const formatDateOfBirth = (dob?: string | null) => {
+    if (!dob) return '—'
+    return new Date(dob).toLocaleDateString('vi-VN')
+  }
+
   const fullAddress = [citizen.address, citizen.ward, citizen.city, citizen.province]
     .filter(Boolean)
     .join(', ')
@@ -385,20 +381,13 @@ function CitizenDetailModal({
       <dl className="grid gap-3 text-sm sm:grid-cols-2">
         <InfoRow label="Họ và tên" value={citizen.fullName} />
         <InfoRow label="Số CCCD" value={citizen.nationalId} />
-        <InfoRow label="Điện thoại" value={citizen.phone} />
+        <InfoRow label="Ngày sinh" value={formatDateOfBirth(citizen.dateOfBirth)} />
         <InfoRow label="Giới tính" value={formatGender(citizen.gender)} />
+        <InfoRow label="Điện thoại" value={citizen.phone} />
         <InfoRow label="Email" value={citizen.email ?? '—'} />
         <InfoRow label="Địa chỉ đầy đủ" value={fullAddress || '—'} />
         <InfoRow label="Vai trò" value={citizen.role || 'CITIZEN'} />
         <InfoRow label="Trạng thái" value={citizen.status || 'ACTIVE'} />
-        <InfoRow
-          label="Ngày tạo"
-          value={citizen.createdAt ? formatDateTime(citizen.createdAt) : '—'}
-        />
-        <InfoRow
-          label="Cập nhật lúc"
-          value={citizen.updatedAt ? formatDateTime(citizen.updatedAt) : '—'}
-        />
       </dl>
 
       <div className="mt-4">
@@ -419,23 +408,6 @@ function CitizenDetailModal({
               </li>
             ))}
           </ul>
-        )}
-      </div>
-
-      <div className="mt-4">
-        <p className="mb-2 text-sm font-semibold text-slate-700">Vi phạm gần đây</p>
-        {ownedVios.length === 0 ? (
-          <p className="text-sm text-slate-400">Không có vi phạm</p>
-        ) : (
-          ownedVios.slice(0, 5).map((v) => (
-            <div
-              key={v.id}
-              className="flex items-center justify-between border-b border-slate-100 py-1.5 text-sm last:border-0"
-            >
-              <span className="text-slate-600">{v.detectedPlateText}</span>
-              <ViolationStatusBadge status={v.status} />
-            </div>
-          ))
         )}
       </div>
 
@@ -470,6 +442,7 @@ function CitizenFormModal({
   title: string
   description: string
   citizen?: VehicleOwner & {
+    dateOfBirth?: string
     gender?: string
     address?: string
     ward?: string
@@ -482,6 +455,7 @@ function CitizenFormModal({
     nationalId: string
     email: string
     phone: string
+    dateOfBirth: string
     gender: string
     address: string
     ward: string
@@ -494,6 +468,7 @@ function CitizenFormModal({
   const [nationalId, setNationalId] = useState(citizen?.nationalId ?? '')
   const [email, setEmail] = useState(citizen?.email ?? '')
   const [phone, setPhone] = useState(citizen?.phone ?? '')
+  const [dateOfBirth, setDateOfBirth] = useState(citizen?.dateOfBirth ?? '')
   const [gender, setGender] = useState(citizen?.gender ?? 'MALE')
   const [address, setAddress] = useState(citizen?.address ?? '')
   const [ward, setWard] = useState(citizen?.ward ?? '')
@@ -511,11 +486,12 @@ function CitizenFormModal({
           e.preventDefault()
           setFormError('')
 
-          // Kiểm tra các trường bắt buộc
           if (
             !fullName.trim() ||
             !nationalId.trim() ||
             !phone.trim() ||
+            !email.trim() ||
+            !dateOfBirth.trim() ||
             !address.trim() ||
             !ward.trim() ||
             !city.trim() ||
@@ -525,16 +501,14 @@ function CitizenFormModal({
             return
           }
 
-          // Ràng buộc CCCD đủ ký tự (chuẩn 12 chữ số)
           const cleanNationalId = nationalId.trim()
           if (!/^\d{12}$/.test(cleanNationalId)) {
             setFormError('Số CCCD phải bao gồm đúng 12 chữ số.')
             return
           }
 
-          // Ràng buộc định dạng Gmail nếu có nhập
           const cleanEmail = email.trim()
-          if (cleanEmail && !/^[\w.-]+@gmail\.com$/i.test(cleanEmail)) {
+          if (!/^[\w.-]+@gmail\.com$/i.test(cleanEmail)) {
             setFormError('Email phải có định dạng chuẩn xxx@gmail.com')
             return
           }
@@ -546,6 +520,7 @@ function CitizenFormModal({
               nationalId: cleanNationalId,
               email: cleanEmail,
               phone: phone.trim(),
+              dateOfBirth: dateOfBirth.trim(),
               gender,
               address: address.trim(),
               ward: ward.trim(),
@@ -585,6 +560,25 @@ function CitizenFormModal({
               placeholder="09xxxxxxxx"
             />
           </Field>
+          <Field label="Ngày sinh *">
+            <input
+              type="date"
+              className={inputClass}
+              value={dateOfBirth}
+              onChange={(e) => setDateOfBirth(e.target.value)}
+            />
+          </Field>
+        </div>
+        <div className="grid grid-cols-2 gap-2">
+          <Field label="Email / Gmail (xxx@gmail.com) *">
+            <input
+              type="email"
+              className={inputClass}
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="example@gmail.com"
+            />
+          </Field>
           <Field label="Giới tính *">
             <select
               className={inputClass}
@@ -597,15 +591,6 @@ function CitizenFormModal({
             </select>
           </Field>
         </div>
-        <Field label="Email / Gmail (xxx@gmail.com)">
-          <input
-            type="email"
-            className={inputClass}
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            placeholder="example@gmail.com"
-          />
-        </Field>
         <Field label="Địa chỉ (Số nhà, tên đường) *">
           <input
             className={inputClass}

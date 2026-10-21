@@ -83,55 +83,78 @@ function CitizenViolations() {
       />
 
       {/* Bộ lọc */}
-      <div className="grid gap-2 rounded-2xl border border-slate-200 bg-white p-3 shadow-sm sm:grid-cols-2 lg:grid-cols-5">
-        <select
-          className={selectCls}
-          value={vehicleId}
-          onChange={(e) => { setVehicleId(e.target.value); setPage(1) }}
-        >
-          <option value="all">Tất cả phương tiện</option>
-          {vehicles.map((v) => (
-            <option key={v.id} value={v.id}>{v.licensePlate}</option>
-          ))}
-        </select>
+      <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+        <div className="space-y-3">
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+            <select
+              className={selectCls}
+              value={vehicleId}
+              onChange={(e) => { setVehicleId(e.target.value); setPage(1) }}
+            >
+              <option value="all">Tất cả phương tiện</option>
+              {vehicles.map((v) => (
+                <option key={v.id} value={v.id}>{v.licensePlate}</option>
+              ))}
+            </select>
 
-        <select className={selectCls} value={type} onChange={(e) => { setType(e.target.value); setPage(1) }}>
-          <option value="all">Tất cả loại lỗi</option>
-          {Object.entries(VIOLATION_TYPE_LABEL).map(([k, l]) => (
-            <option key={k} value={k}>{l}</option>
-          ))}
-        </select>
+            <select className={selectCls} value={type} onChange={(e) => { setType(e.target.value); setPage(1) }}>
+              <option value="all">Tất cả loại lỗi</option>
+              {Object.entries(VIOLATION_TYPE_LABEL).map(([k, l]) => (
+                <option key={k} value={k}>{l}</option>
+              ))}
+            </select>
 
-        <select className={selectCls} value={status} onChange={(e) => { setStatus(e.target.value); setPage(1) }}>
-          <option value="all">Tất cả trạng thái</option>
-          {Object.entries(VIOLATION_STATUS_LABEL).map(([k, l]) => (
-            <option key={k} value={k}>{l}</option>
-          ))}
-        </select>
+            <select className={selectCls} value={status} onChange={(e) => { setStatus(e.target.value); setPage(1) }}>
+              <option value="all">Tất cả trạng thái</option>
+              {Object.entries(VIOLATION_STATUS_LABEL).map(([k, l]) => (
+                <option key={k} value={k}>{l}</option>
+              ))}
+            </select>
 
-        <div>
-          <label className="mb-0.5 block text-xs text-slate-500">Từ ngày</label>
-          <input
-            type="date"
-            value={from}
-            onChange={(e) => { setFrom(e.target.value); setPage(1) }}
-            className={inputCls}
-          />
-        </div>
+            <div>
+              <label className="mb-1 block text-xs font-medium text-slate-600">Từ ngày</label>
+              <input
+                type="date"
+                value={from}
+                onChange={(e) => { setFrom(e.target.value); setPage(1) }}
+                className={inputCls}
+              />
+            </div>
 
-        <div>
-          <label className="mb-0.5 block text-xs text-slate-500">Đến ngày</label>
-          <input
-            type="date"
-            value={to}
-            onChange={(e) => { setTo(e.target.value); setPage(1) }}
-            className={inputCls}
-          />
+            <div>
+              <label className="mb-1 block text-xs font-medium text-slate-600">Đến ngày</label>
+              <input
+                type="date"
+                value={to}
+                onChange={(e) => { setTo(e.target.value); setPage(1) }}
+                className={inputCls}
+              />
+            </div>
+          </div>
+          
+          {(vehicleId !== 'all' || type !== 'all' || status !== 'all' || from || to) && (
+            <div className="border-t border-slate-100 pt-3">
+              <button
+                type="button"
+                onClick={() => {
+                  setVehicleId('all')
+                  setType('all')
+                  setStatus('all')
+                  setFrom('')
+                  setTo('')
+                  setPage(1)
+                }}
+                className="text-sm text-slate-600 hover:text-slate-900 hover:underline"
+              >
+                Xóa bộ lọc
+              </button>
+            </div>
+          )}
         </div>
       </div>
 
-      {/* Bảng dữ liệu */}
-      <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+      {/* Danh sách vi phạm */}
+      <div className="rounded-2xl border border-slate-200 bg-white shadow-sm">
         {rows.length === 0 ? (
           <EmptyState
             title="Không có vi phạm phù hợp"
@@ -139,71 +162,105 @@ function CitizenViolations() {
           />
         ) : (
           <>
-            {/* Desktop table */}
-            <div className="hidden overflow-x-auto md:block">
-              <table className="w-full text-sm">
-                <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
-                  <tr>
-                    <th className="px-4 py-3 text-left font-medium">Biển số</th>
-                    <th className="px-4 py-3 text-left font-medium">Loại lỗi</th>
-                    <th className="px-4 py-3 text-left font-medium">Thời gian</th>
-                    <th className="px-4 py-3 text-left font-medium">Địa điểm</th>
-                    <th className="px-4 py-3 text-left font-medium">Trạng thái</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
-                  {rows.map((v) => (
-                    <tr key={v.id} className="hover:bg-slate-50">
-                      <td className="px-4 py-3">
-                        <Link
-                          to="/citizen/violations/$id"
-                          params={{ id: v.id }}
-                          className="plate font-mono font-semibold text-blue-700 hover:underline"
-                        >
-                          {vehicles.find((x) => x.id === v.vehicleId)?.licensePlate || v.detectedPlateText}
-                        </Link>
-                      </td>
-                      <td className="px-4 py-3 text-slate-700">
-                        {VIOLATION_TYPE_LABEL[v.violationType as ViolationType]}
-                      </td>
-                      <td className="px-4 py-3 text-slate-600">{formatDateTime(v.detectedAt)}</td>
-                      <td className="px-4 py-3 text-slate-600">
-                        {v.cameraLocation || '—'}
-                      </td>
-                      <td className="px-4 py-3">
-                        <ViolationStatusBadge status={v.status as ViolationStatus} />
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-
-            {/* Mobile list */}
-            <ul className="divide-y divide-slate-100 md:hidden">
-              {rows.map((v) => (
-                <li key={v.id}>
+            {/* Desktop: Grid layout with cards */}
+            <div className="hidden gap-3 p-4 sm:grid sm:grid-cols-1 lg:grid-cols-2 xl:grid-cols-3">
+              {rows.map((v) => {
+                const vehicle = vehicles.find((x) => x.id === v.vehicleId)
+                const plate = vehicle?.licensePlate || v.detectedPlateText
+                return (
                   <Link
+                    key={v.id}
                     to="/citizen/violations/$id"
                     params={{ id: v.id }}
-                    className="block space-y-1 p-4 hover:bg-slate-50"
+                    className="group overflow-hidden rounded-xl border border-slate-200 bg-white transition-all hover:shadow-md"
                   >
-                    <div className="flex items-center justify-between gap-2">
-                      <span className="plate font-mono text-sm font-semibold">
-                        {vehicles.find((x) => x.id === v.vehicleId)?.licensePlate || v.detectedPlateText}
-                      </span>
-                      <ViolationStatusBadge status={v.status} />
+                    <div className="relative h-32 overflow-hidden bg-slate-100">
+                      <img
+                        src={v.evidenceImageUrl || `https://picsum.photos/seed/${v.id}/400/200`}
+                        alt="Ảnh chứng cứ"
+                        className="h-full w-full object-cover transition-transform group-hover:scale-105"
+                        loading="lazy"
+                      />
+                      <div className="absolute right-2 top-2">
+                        <ViolationStatusBadge status={v.status as ViolationStatus} />
+                      </div>
                     </div>
-                    <p className="text-sm font-medium text-slate-800">
-                      {VIOLATION_TYPE_LABEL[v.violationType as ViolationType]}
-                    </p>
-                    <p className="text-xs text-slate-500">
-                      {formatDateTime(v.detectedAt)}
-                      {v.cameraLocation ? ` · ${v.cameraLocation}` : ''}
-                    </p>
+                    <div className="space-y-2 p-3">
+                      <div className="flex items-start justify-between gap-2">
+                        <span className="plate font-mono text-sm font-bold text-slate-900">
+                          {plate}
+                        </span>
+                        {vehicle && (
+                          <span className="rounded-md bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-700">
+                            {vehicle.vehicleType}
+                          </span>
+                        )}
+                      </div>
+                      <p className="font-semibold text-slate-900 text-sm">
+                        {VIOLATION_TYPE_LABEL[v.violationType as ViolationType]}
+                      </p>
+                      <div className="space-y-0.5 text-xs text-slate-600">
+                        <p>{formatDateTime(v.detectedAt)}</p>
+                        <p className="line-clamp-1">{v.cameraLocation || '—'}</p>
+                      </div>
+                      {v.fineDefaultAmount && (
+                        <div className="flex items-center justify-between border-t border-slate-100 pt-2">
+                          <span className="text-xs text-slate-500">Mức phạt</span>
+                          <span className="font-bold text-red-700 text-sm">
+                            {v.fineDefaultAmount.toLocaleString('vi-VN')} đ
+                          </span>
+                        </div>
+                      )}
+                    </div>
                   </Link>
-                </li>
-              ))}
+                )
+              })}
+            </div>
+
+            {/* Mobile: Compact list */}
+            <ul className="divide-y divide-slate-100 sm:hidden">
+              {rows.map((v) => {
+                const vehicle = vehicles.find((x) => x.id === v.vehicleId)
+                const plate = vehicle?.licensePlate || v.detectedPlateText
+                return (
+                  <li key={v.id}>
+                    <Link
+                      to="/citizen/violations/$id"
+                      params={{ id: v.id }}
+                      className="flex gap-3 p-3 hover:bg-slate-50"
+                    >
+                      <div className="relative h-20 w-20 shrink-0 overflow-hidden rounded-lg bg-slate-100">
+                        <img
+                          src={v.evidenceImageUrl || `https://picsum.photos/seed/${v.id}/400/200`}
+                          alt="Ảnh chứng cứ"
+                          className="h-full w-full object-cover"
+                          loading="lazy"
+                        />
+                      </div>
+                      <div className="min-w-0 flex-1 space-y-1">
+                        <div className="flex items-start justify-between gap-2">
+                          <span className="plate font-mono text-sm font-bold">
+                            {plate}
+                          </span>
+                          <ViolationStatusBadge status={v.status} />
+                        </div>
+                        <p className="text-sm font-semibold text-slate-900">
+                          {VIOLATION_TYPE_LABEL[v.violationType as ViolationType]}
+                        </p>
+                        <p className="text-xs text-slate-600">
+                          {formatDateTime(v.detectedAt)}
+                          {v.cameraLocation ? ` · ${v.cameraLocation}` : ''}
+                        </p>
+                        {v.fineDefaultAmount && (
+                          <p className="text-sm font-bold text-red-700">
+                            {v.fineDefaultAmount.toLocaleString('vi-VN')} đ
+                          </p>
+                        )}
+                      </div>
+                    </Link>
+                  </li>
+                )
+              })}
             </ul>
 
             {/* Phân trang */}

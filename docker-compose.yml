@@ -26,8 +26,21 @@ services:
       - DB_USER=root
       - DB_PASSWORD=root
       - DB_NAME=DoAnTotNghiep
+      - AI_SERVICE_URL=http://host.docker.internal:8000
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     depends_on:
       - mysql-db
+
+  # Service 3: AI Service (Optional - Uncomment để dùng)
+  # ai-service:
+  #   build: ./ai-service
+  #   container_name: DoAnTotNghiep-AI
+  #   restart: always
+  #   ports:
+  #     - "8000:8000"
+  #   volumes:
+  #     - ./ai-service:/app
 
 volumes:
   mysql_data:

@@ -21,12 +21,15 @@ import { Route as OfficerCitizensRouteImport } from './routes/officer/citizens'
 import { Route as OfficerDashboardRouteImport } from './routes/officer/dashboard'
 import { Route as OfficerScanRouteImport } from './routes/officer/scan'
 import { Route as OfficerVehiclesRouteImport } from './routes/officer/vehicles'
+import { Route as OfficerViolation_queuesRouteImport } from './routes/officer/violation_queues'
 import { Route as CitizenInvoicesIndexRouteImport } from './routes/citizen/invoices/index'
 import { Route as CitizenInvoicesIdRouteImport } from './routes/citizen/invoices/$id'
 import { Route as CitizenVehiclesIndexRouteImport } from './routes/citizen/vehicles/index'
 import { Route as CitizenVehiclesIdRouteImport } from './routes/citizen/vehicles/$id'
 import { Route as CitizenViolationsIndexRouteImport } from './routes/citizen/violations/index'
 import { Route as CitizenViolationsIdRouteImport } from './routes/citizen/violations/$id'
+import { Route as OfficerViolationsIndexRouteImport } from './routes/officer/violations/index'
+import { Route as OfficerViolationsIdRouteImport } from './routes/officer/violations/$id'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -88,6 +91,11 @@ const OfficerVehiclesRoute = OfficerVehiclesRouteImport.update({
   path: '/vehicles',
   getParentRoute: () => OfficerRoute,
 } as any)
+const OfficerViolation_queuesRoute = OfficerViolation_queuesRouteImport.update({
+  id: '/violation_queues',
+  path: '/violation_queues',
+  getParentRoute: () => OfficerRoute,
+} as any)
 const CitizenInvoicesIndexRoute = CitizenInvoicesIndexRouteImport.update({
   id: '/invoices/',
   path: '/invoices/',
@@ -118,6 +126,16 @@ const CitizenViolationsIdRoute = CitizenViolationsIdRouteImport.update({
   path: '/violations/$id',
   getParentRoute: () => CitizenRoute,
 } as any)
+const OfficerViolationsIndexRoute = OfficerViolationsIndexRouteImport.update({
+  id: '/violations/',
+  path: '/violations/',
+  getParentRoute: () => OfficerRoute,
+} as any)
+const OfficerViolationsIdRoute = OfficerViolationsIdRouteImport.update({
+  id: '/violations/$id',
+  path: '/violations/$id',
+  getParentRoute: () => OfficerRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -130,14 +148,17 @@ export interface FileRoutesByFullPath {
   '/officer/dashboard': typeof OfficerDashboardRoute
   '/officer/scan': typeof OfficerScanRoute
   '/officer/vehicles': typeof OfficerVehiclesRoute
+  '/officer/violation_queues': typeof OfficerViolation_queuesRoute
   '/citizen/': typeof CitizenIndexRoute
   '/officer/': typeof OfficerIndexRoute
   '/citizen/invoices/$id': typeof CitizenInvoicesIdRoute
   '/citizen/vehicles/$id': typeof CitizenVehiclesIdRoute
   '/citizen/violations/$id': typeof CitizenViolationsIdRoute
+  '/officer/violations/$id': typeof OfficerViolationsIdRoute
   '/citizen/invoices/': typeof CitizenInvoicesIndexRoute
   '/citizen/vehicles/': typeof CitizenVehiclesIndexRoute
   '/citizen/violations/': typeof CitizenViolationsIndexRoute
+  '/officer/violations/': typeof OfficerViolationsIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -148,14 +169,17 @@ export interface FileRoutesByTo {
   '/officer/dashboard': typeof OfficerDashboardRoute
   '/officer/scan': typeof OfficerScanRoute
   '/officer/vehicles': typeof OfficerVehiclesRoute
+  '/officer/violation_queues': typeof OfficerViolation_queuesRoute
   '/citizen': typeof CitizenIndexRoute
   '/officer': typeof OfficerIndexRoute
   '/citizen/invoices/$id': typeof CitizenInvoicesIdRoute
   '/citizen/vehicles/$id': typeof CitizenVehiclesIdRoute
   '/citizen/violations/$id': typeof CitizenViolationsIdRoute
+  '/officer/violations/$id': typeof OfficerViolationsIdRoute
   '/citizen/invoices': typeof CitizenInvoicesIndexRoute
   '/citizen/vehicles': typeof CitizenVehiclesIndexRoute
   '/citizen/violations': typeof CitizenViolationsIndexRoute
+  '/officer/violations': typeof OfficerViolationsIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -169,14 +193,17 @@ export interface FileRoutesById {
   '/officer/dashboard': typeof OfficerDashboardRoute
   '/officer/scan': typeof OfficerScanRoute
   '/officer/vehicles': typeof OfficerVehiclesRoute
+  '/officer/violation_queues': typeof OfficerViolation_queuesRoute
   '/citizen/': typeof CitizenIndexRoute
   '/officer/': typeof OfficerIndexRoute
   '/citizen/invoices/$id': typeof CitizenInvoicesIdRoute
   '/citizen/vehicles/$id': typeof CitizenVehiclesIdRoute
   '/citizen/violations/$id': typeof CitizenViolationsIdRoute
+  '/officer/violations/$id': typeof OfficerViolationsIdRoute
   '/citizen/invoices/': typeof CitizenInvoicesIndexRoute
   '/citizen/vehicles/': typeof CitizenVehiclesIndexRoute
   '/citizen/violations/': typeof CitizenViolationsIndexRoute
+  '/officer/violations/': typeof OfficerViolationsIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -191,14 +218,17 @@ export interface FileRouteTypes {
     | '/officer/dashboard'
     | '/officer/scan'
     | '/officer/vehicles'
+    | '/officer/violation_queues'
     | '/citizen/'
     | '/officer/'
     | '/citizen/invoices/$id'
     | '/citizen/vehicles/$id'
     | '/citizen/violations/$id'
+    | '/officer/violations/$id'
     | '/citizen/invoices/'
     | '/citizen/vehicles/'
     | '/citizen/violations/'
+    | '/officer/violations/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -209,14 +239,17 @@ export interface FileRouteTypes {
     | '/officer/dashboard'
     | '/officer/scan'
     | '/officer/vehicles'
+    | '/officer/violation_queues'
     | '/citizen'
     | '/officer'
     | '/citizen/invoices/$id'
     | '/citizen/vehicles/$id'
     | '/citizen/violations/$id'
+    | '/officer/violations/$id'
     | '/citizen/invoices'
     | '/citizen/vehicles'
     | '/citizen/violations'
+    | '/officer/violations'
   id:
     | '__root__'
     | '/'
@@ -229,14 +262,17 @@ export interface FileRouteTypes {
     | '/officer/dashboard'
     | '/officer/scan'
     | '/officer/vehicles'
+    | '/officer/violation_queues'
     | '/citizen/'
     | '/officer/'
     | '/citizen/invoices/$id'
     | '/citizen/vehicles/$id'
     | '/citizen/violations/$id'
+    | '/officer/violations/$id'
     | '/citizen/invoices/'
     | '/citizen/vehicles/'
     | '/citizen/violations/'
+    | '/officer/violations/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -332,6 +368,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof OfficerVehiclesRouteImport
       parentRoute: typeof OfficerRoute
     }
+    '/officer/violation_queues': {
+      id: '/officer/violation_queues'
+      path: '/violation_queues'
+      fullPath: '/officer/violation_queues'
+      preLoaderRoute: typeof OfficerViolation_queuesRouteImport
+      parentRoute: typeof OfficerRoute
+    }
     '/citizen/invoices/': {
       id: '/citizen/invoices/'
       path: '/invoices'
@@ -374,6 +417,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof CitizenViolationsIdRouteImport
       parentRoute: typeof CitizenRoute
     }
+    '/officer/violations/': {
+      id: '/officer/violations/'
+      path: '/violations'
+      fullPath: '/officer/violations/'
+      preLoaderRoute: typeof OfficerViolationsIndexRouteImport
+      parentRoute: typeof OfficerRoute
+    }
+    '/officer/violations/$id': {
+      id: '/officer/violations/$id'
+      path: '/violations/$id'
+      fullPath: '/officer/violations/$id'
+      preLoaderRoute: typeof OfficerViolationsIdRouteImport
+      parentRoute: typeof OfficerRoute
+    }
   }
 }
 
@@ -409,7 +466,10 @@ interface OfficerRouteChildren {
   OfficerDashboardRoute: typeof OfficerDashboardRoute
   OfficerScanRoute: typeof OfficerScanRoute
   OfficerVehiclesRoute: typeof OfficerVehiclesRoute
+  OfficerViolation_queuesRoute: typeof OfficerViolation_queuesRoute
   OfficerIndexRoute: typeof OfficerIndexRoute
+  OfficerViolationsIdRoute: typeof OfficerViolationsIdRoute
+  OfficerViolationsIndexRoute: typeof OfficerViolationsIndexRoute
 }
 
 const OfficerRouteChildren: OfficerRouteChildren = {
@@ -417,7 +477,10 @@ const OfficerRouteChildren: OfficerRouteChildren = {
   OfficerDashboardRoute: OfficerDashboardRoute,
   OfficerScanRoute: OfficerScanRoute,
   OfficerVehiclesRoute: OfficerVehiclesRoute,
+  OfficerViolation_queuesRoute: OfficerViolation_queuesRoute,
   OfficerIndexRoute: OfficerIndexRoute,
+  OfficerViolationsIdRoute: OfficerViolationsIdRoute,
+  OfficerViolationsIndexRoute: OfficerViolationsIndexRoute,
 }
 
 const OfficerRouteWithChildren =

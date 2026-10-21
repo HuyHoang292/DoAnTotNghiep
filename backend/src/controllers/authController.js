@@ -50,7 +50,15 @@ exports.login = async (req, res) => {
         phone: user.phone,
         role: user.role,
         badgeNumber: user.badge_number,
-        unit: user.role === 'OFFICER' ? 'Phòng CSGT' : undefined
+        unit: user.role === 'OFFICER' ? 'Phòng CSGT' : undefined,
+        dateOfBirth: user.date_of_birth ? new Date(user.date_of_birth).toISOString().slice(0, 10) : null,
+        gender: user.gender ?? null,
+        address: user.address ?? null,
+        ward: user.ward ?? null,
+        city: user.city ?? null,
+        province: user.province ?? null,
+        passwordChanged: user.password_changed ?? false,
+        mustChangePassword: user.must_change_password ?? false,
       }
     });
   } catch (error) {
@@ -74,11 +82,14 @@ exports.getMe = async (req, res) => {
         role: user.role,
         badgeNumber: user.badge_number,
         unit: user.role === 'OFFICER' ? 'Phòng CSGT' : undefined,
+        dateOfBirth: user.date_of_birth ? new Date(user.date_of_birth).toISOString().slice(0, 10) : null,
         gender: user.gender ?? null,
         address: user.address ?? null,
         ward: user.ward ?? null,
         city: user.city ?? null,
         province: user.province ?? null,
+        passwordChanged: user.password_changed ?? false,
+        mustChangePassword: user.must_change_password ?? false,
       }
     });
   } catch (error) {
@@ -106,7 +117,11 @@ exports.changePassword = async (req, res) => {
     }
 
     const hashed = await bcrypt.hash(newPassword, 12);
-    await db('users').where('id', req.user.id).update({ password_hash: hashed });
+    await db('users').where('id', req.user.id).update({ 
+      password_hash: hashed,
+      password_changed: true,
+      must_change_password: false
+    });
 
     return res.json({ message: 'Đổi mật khẩu thành công.' });
   } catch (error) {

@@ -15,9 +15,10 @@ import {
   Video,
   X,
 } from 'lucide-react'
-import { useState, type ReactNode } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
 import { useAuth } from '@/lib/auth'
 import { cn } from '@/lib/cn'
+import { ChangePasswordModal } from './ChangePasswordModal'
 
 type Role = 'CITIZEN' | 'OFFICER' | 'ADMIN'
 
@@ -34,8 +35,8 @@ const officerNav = [
   { to: '/officer/scan',      label: 'Quét biển số', icon: ScanLine },
   { to: '/officer/vehicles',  label: 'Phương tiện',  icon: Car },
   { to: '/officer/citizens',  label: 'Công dân',     icon: Users },
-  { to: '/officer/dashboard', label: 'Vi phạm',      icon: TriangleAlert, disabled: true },
-  { to: '/officer/dashboard', label: 'Hàng đợi AI',  icon: ListChecks, disabled: true },
+  { to: '/officer/violations', label: 'Vi phạm',      icon: TriangleAlert },
+  { to: '/officer/violation_queues', label: 'Hàng đợi AI',  icon: ListChecks },
   { to: '/officer/dashboard', label: 'Camera',       icon: Video, disabled: true },
 ]
 
@@ -46,16 +47,30 @@ export function AppShell({
   role: Role
   children?: ReactNode
 }) {
-  const { user, logout } = useAuth()
+  const { user, logout, reload } = useAuth()
   const navigate = useNavigate()
   const pathname = useRouterState({ select: (s) => s.location.pathname })
   const [open, setOpen] = useState(false)
+  const [showChangePassword, setShowChangePassword] = useState(false)
   const nav = role === 'CITIZEN' ? citizenNav : officerNav
   const isOfficer = role !== 'CITIZEN'
+
+  // Kiểm tra nếu user cần đổi mật khẩu
+  useEffect(() => {
+    if (user?.mustChangePassword) {
+      setShowChangePassword(true)
+    }
+  }, [user?.mustChangePassword])
 
   const handleLogout = () => {
     logout()
     navigate({ to: '/' })
+  }
+
+  const handlePasswordChanged = async () => {
+    setShowChangePassword(false)
+    // Reload user để cập nhật trạng thái
+    await reload()
   }
 
   return (
@@ -93,7 +108,10 @@ export function AppShell({
 
         <nav className="flex-1 space-y-1 px-3">
           {nav.map((item) => {
-            const active = !item.disabled && pathname === item.to
+            const active =
+              !item.disabled &&
+              (pathname === item.to ||
+                (item.to !== '/officer/dashboard' && pathname.startsWith(`${item.to}/`)))
             const Icon = item.icon
             const className = cn(
               'flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm',
@@ -170,6 +188,15 @@ export function AppShell({
         </header>
         <main className="space-y-5 p-4 md:p-6">{children ?? <Outlet />}</main>
       </div>
+
+      {/* Modal đổi mật khẩu bắt buộc */}
+      {showChangePassword && (
+        <ChangePasswordModal
+          isRequired={true}
+          onClose={() => setShowChangePassword(false)}
+          onSuccess={handlePasswordChanged}
+        />
+      )}
     </div>
   )
 }

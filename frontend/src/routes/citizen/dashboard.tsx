@@ -1,9 +1,9 @@
 import { createFileRoute, Link } from '@tanstack/react-router'
-import { Car, FileText, TriangleAlert, Wallet } from 'lucide-react'
+import { Car, FileText, Loader2, TriangleAlert, Wallet } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
-import { EmptyState, PageHeader, StatCard, ViolationStatusBadge } from '@/components/ui'
+import { EmptyState, Modal, PageHeader, StatCard, ViolationStatusBadge } from '@/components/ui'
 import { useAuth } from '@/lib/auth'
-import { getCitizenDashboard } from '@/lib/api'
+import { changePasswordRequest, getCitizenDashboard } from '@/lib/api'
 import { formatCurrency, formatDate, formatDateTime } from '@/lib/format'
 import { VIOLATION_TYPE_LABEL, type Invoice, type Vehicle, type Violation } from '@/lib/types'
 
@@ -11,13 +11,24 @@ export const Route = createFileRoute('/citizen/dashboard')({
   component: CitizenDashboard,
 })
 
+const inputClass =
+  'h-10 w-full rounded-xl border border-slate-200 px-3 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100'
+
 function CitizenDashboard() {
-  const { user } = useAuth()
+  const { user, reload } = useAuth()
   const [vehicles, setVehicles] = useState<Vehicle[]>([])
   const [violations, setViolations] = useState<Violation[]>([])
   const [invoices, setInvoices] = useState<Invoice[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+
+  // Modal đổi mật khẩu
+  const [showPasswordModal, setShowPasswordModal] = useState(false)
+  const [oldPassword, setOldPassword] = useState('')
+  const [newPassword, setNewPassword] = useState('')
+  const [confirmPassword, setConfirmPassword] = useState('')
+  const [passwordError, setPasswordError] = useState('')
+  const [saving, setSaving] = useState(false)
 
   useEffect(() => {
     let cancelled = false
@@ -40,6 +51,13 @@ function CitizenDashboard() {
       cancelled = true
     }
   }, [])
+
+  // Hiển thị modal đổi mật khẩu nếu chưa đổi lần nào
+  useEffect(() => {
+    if (user && user.passwordChanged === false && !loading) {
+      setShowPasswordModal(true)
+    }
+  }, [user, loading])
 
   const unpaid = invoices.filter((i) => i.status === 'UNPAID' || i.status === 'OVERDUE')
   const unpaidIds = new Set(unpaid.map((i) => i.violationId))
@@ -76,6 +94,40 @@ function CitizenDashboard() {
       v.status !== 'REJECTED' &&
       (v.status !== 'INVOICED' || unpaidIds.has(v.id)),
   )
+
+  const handleChangePassword = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setPasswordError('')
+
+    if (!oldPassword || !newPassword || !confirmPassword) {
+      setPasswordError('Vui lòng nhập đầy đủ thông tin.')
+      return
+    }
+
+    if (newPassword.length < 6) {
+      setPasswordError('Mật khẩu mới phải có ít nhất 6 ký tự.')
+      return
+    }
+
+    if (newPassword !== confirmPassword) {
+      setPasswordError('Mật khẩu mới và xác nhận mật khẩu không khớp.')
+      return
+    }
+
+    setSaving(true)
+    try {
+      await changePasswordRequest({ oldPassword, newPassword })
+      await reload()
+      setShowPasswordModal(false)
+      setOldPassword('')
+      setNewPassword('')
+      setConfirmPassword('')
+    } catch (err) {
+      setPasswordError(err instanceof Error ? err.message : 'Không đổi được mật khẩu.')
+    } finally {
+      setSaving(false)
+    }
+  }
 
   if (loading) {
     return <p className="text-sm text-slate-500">Đang tải dữ liệu từ hệ thống...</p>
@@ -238,6 +290,81 @@ function CitizenDashboard() {
           </div>
         </section>
       </div>
+
+      {/* Modal đổi mật khẩu bắt buộc */}
+      {showPasswordModal && (
+        <Modal
+          title="Đổi mật khẩu lần đầu"
+          description="Bạn đang sử dụng mật khẩu mặc định. Vui lòng đổi mật khẩu để bảo mật tài khoản."
+          onClose={() => {}} // Không cho đóng modal
+          wide={false}
+        >
+          <form onSubmit={handleChangePassword} className="space-y-3">
+            <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
+              <p className="font-semibold">⚠️ Bắt buộc đổi mật khẩu</p>
+              <p className="mt-1">
+                Đây là lần đăng nhập đầu tiên hoặc bạn đang dùng mật khẩu mặc định. 
+                Vui lòng đổi mật khẩu để tiếp tục sử dụng hệ thống.
+              </p>
+            </div>
+
+            <Field label="Mật khẩu hiện tại">
+              <input
+                type="password"
+                className={inputClass}
+                value={oldPassword}
+                onChange={(e) => setOldPassword(e.target.value)}
+                placeholder="Nhập mật khẩu hiện tại"
+                autoFocus
+              />
+            </Field>
+
+            <Field label="Mật khẩu mới (tối thiểu 6 ký tự)">
+              <input
+                type="password"
+                className={inputClass}
+                value={newPassword}
+                onChange={(e) => setNewPassword(e.target.value)}
+                placeholder="Nhập mật khẩu mới"
+              />
+            </Field>
+
+            <Field label="Xác nhận mật khẩu mới">
+              <input
+                type="password"
+                className={inputClass}
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                placeholder="Nhập lại mật khẩu mới"
+              />
+            </Field>
+
+            {passwordError && (
+              <p className="text-sm text-red-600">{passwordError}</p>
+            )}
+
+            <div className="flex justify-end pt-2">
+              <button
+                type="submit"
+                disabled={saving}
+                className="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-60"
+              >
+                {saving && <Loader2 className="h-4 w-4 animate-spin" />}
+                Đổi mật khẩu
+              </button>
+            </div>
+          </form>
+        </Modal>
+      )}
     </>
+  )
+}
+
+function Field({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <label className="block">
+      <span className="mb-1 block text-xs font-medium text-slate-500">{label}</span>
+      {children}
+    </label>
   )
 }
