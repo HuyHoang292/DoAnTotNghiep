@@ -417,12 +417,38 @@ function VehicleDetailModal({
   onTransfer: () => void
 }) {
   const vioCount = violations.filter((x) => x.vehicleId === vehicle.id).length
+  const needsAttention = vehicle.verificationStatus === 'REVISION_REQUESTED' || vehicle.verificationStatus === 'REJECTED'
 
   return (
     <Modal title="Thông tin phương tiện" onClose={onClose} wide>
       <div className="mb-4">
         <PlateTag value={vehicle.licensePlate} />
       </div>
+
+      {/* Trạng thái xác minh */}
+      {needsAttention && vehicle.citizenFeedback && (
+        <div className={`mb-4 rounded-xl border p-3 ${
+          vehicle.verificationStatus === 'REJECTED'
+            ? 'border-red-200 bg-red-50'
+            : 'border-blue-200 bg-blue-50'
+        }`}>
+          <p className={`text-xs font-semibold uppercase tracking-wide ${
+            vehicle.verificationStatus === 'REJECTED'
+              ? 'text-red-700'
+              : 'text-blue-700'
+          }`}>
+            {vehicle.verificationStatus === 'REJECTED' ? '⚠️ Công dân từ chối' : '📝 Yêu cầu chỉnh sửa'}
+          </p>
+          <p className={`mt-1.5 text-sm ${
+            vehicle.verificationStatus === 'REJECTED'
+              ? 'text-red-900'
+              : 'text-blue-900'
+          }`}>
+            {vehicle.citizenFeedback}
+          </p>
+        </div>
+      )}
+
       <dl className="grid gap-3 text-sm sm:grid-cols-2">
         <InfoRow label="Loại xe" value={VEHICLE_TYPE_LABEL[vehicle.vehicleType] ?? vehicle.vehicleType} />
         <InfoRow label="Hãng / Mẫu" value={`${vehicle.brand || '—'} ${vehicle.model || ''}`.trim()} />
@@ -437,6 +463,7 @@ function VehicleDetailModal({
         <InfoRow label="Email chủ xe" value={vehicle.ownerEmail || '—'} />
         <InfoRow label="Số khung" value={vehicle.chassisNumber || '—'} />
         <InfoRow label="Số máy" value={vehicle.engineNumber || '—'} />
+        <InfoRow label="Số bảo hiểm" value={vehicle.insuranceNumber || '—'} />
         <InfoRow
           label="Ngày tạo"
           value={vehicle.createdAt ? formatDateTime(vehicle.createdAt) : '—'}
@@ -467,10 +494,14 @@ function VehicleDetailModal({
         <button
           type="button"
           onClick={onEdit}
-          className="inline-flex items-center gap-1.5 rounded-xl bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
+          className={`inline-flex items-center gap-1.5 rounded-xl px-4 py-2 text-sm font-medium text-white ${
+            needsAttention
+              ? 'bg-orange-600 hover:bg-orange-700'
+              : 'bg-blue-600 hover:bg-blue-700'
+          }`}
         >
           <Pencil className="h-3.5 w-3.5" />
-          Chỉnh sửa
+          {needsAttention ? 'Cập nhật thông tin' : 'Chỉnh sửa'}
         </button>
       </div>
     </Modal>
@@ -497,6 +528,7 @@ function VehicleFormModal({
     brand?: string
     model?: string
     color?: string
+    insuranceNumber?: string
     registeredAt: string
   }) => Promise<void>
 }) {
@@ -506,6 +538,7 @@ function VehicleFormModal({
   const [brand, setBrand] = useState('')
   const [model, setModel] = useState('')
   const [color, setColor] = useState('')
+  const [insuranceNumber, setInsuranceNumber] = useState('')
   const [registeredAt, setRegisteredAt] = useState(isEdit ? '' : todayInput())
   const [ownerId, setOwnerId] = useState(isEdit ? '' : citizens[0]?.id ?? '')
   const [saving, setSaving] = useState(false)
@@ -531,6 +564,7 @@ function VehicleFormModal({
               brand: brand.trim(),
               model: model.trim(),
               color: color.trim(),
+              insuranceNumber: insuranceNumber.trim(),
               registeredAt,
             })
           } catch (err) {
@@ -584,6 +618,14 @@ function VehicleFormModal({
             value={color}
             onChange={(e) => setColor(e.target.value)}
             placeholder={vehicle?.color || 'Trắng'}
+          />
+        </Field>
+        <Field label="Số bảo hiểm">
+          <input
+            className={inputClass}
+            value={insuranceNumber}
+            onChange={(e) => setInsuranceNumber(e.target.value)}
+            placeholder={vehicle?.insuranceNumber || 'Nhập số bảo hiểm (nếu có)'}
           />
         </Field>
         <Field label={isEdit ? 'Ngày đăng ký (để trống nếu không đổi)' : 'Ngày đăng ký'}>

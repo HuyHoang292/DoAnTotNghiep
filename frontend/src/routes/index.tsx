@@ -74,7 +74,7 @@ function LoginPage() {
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <label className="block text-sm font-medium text-slate-700">
-              Tên đăng nhập / CCCD / Email
+              Tên đăng nhập
             </label>
             <div className="relative mt-1">
               <UserIcon className="absolute left-3 top-2.5 h-5 w-5 text-slate-400" />

@@ -1,7 +1,6 @@
 exports.up = function(knex) {
   return knex.schema.createTable('fines', (table) => {
-    table.increments('id').primary();
-    table.enum('violation_type', ['RED_LIGHT', 'WRONG_LANE', 'SPEEDING', 'ILLEGAL_PARKING', 'HELMET_LESS', 'WRONG_WAY']).notNullable().unique();
+    table.string('violation_type', 50).primary(); // Khóa chính là violation_type
     table.string('title', 255).notNullable();
     table.text('description').nullable();
     table.decimal('min_amount', 12, 2).notNullable();

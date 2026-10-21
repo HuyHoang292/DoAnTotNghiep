@@ -41,7 +41,7 @@ function CitizenProfile() {
     setSubmitting(true)
     try {
       // Mật khẩu được hash bcrypt (salt rounds=12) ở phía backend trước khi lưu DB
-      const res = await changePasswordRequest(oldPass, newPass)
+      const res = await changePasswordRequest({ oldPassword: oldPass, newPassword: newPass })
       setMsg({ type: 'ok', text: res.message || 'Đổi mật khẩu thành công.' })
       setOldPass('')
       setNewPass('')
@@ -59,9 +59,10 @@ function CitizenProfile() {
   const infoRows: [string, string][] = [
     ['Họ và tên', user.fullName],
     ['Số CCCD / CMND', user.nationalId],
+    ['Ngày sinh', user.dateOfBirth ? new Date(user.dateOfBirth).toLocaleDateString('vi-VN') : '—'],
+    ['Giới tính', user.gender ? (GENDER_LABEL[user.gender] ?? user.gender) : '—'],
     ['Số điện thoại', user.phone],
     ['Email', user.email || '—'],
-    ['Giới tính', user.gender ? (GENDER_LABEL[user.gender] ?? user.gender) : '—'],
     ['Địa chỉ', user.address || '—'],
     ['Phường / Xã', user.ward || '—'],
     ['Thành phố', user.city || '—'],

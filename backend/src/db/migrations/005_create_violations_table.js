@@ -6,10 +6,15 @@ exports.up = function(knex) {
     table.string('detected_plate_text', 20).notNullable();
     table.string('corrected_plate_text', 20).nullable();
     table.float('ocr_confidence').notNullable();
-    table.enum('violation_type', ['RED_LIGHT', 'WRONG_LANE', 'SPEEDING', 'ILLEGAL_PARKING', 'HELMET_LESS', 'WRONG_WAY']).notNullable();
+    
+    // Khóa ngoại tham chiếu đến bảng fines để lấy thông tin tiền phạt
+    table.string('violation_type', 50).notNullable()
+      .references('violation_type').inTable('fines').onDelete('RESTRICT');
+
     table.text('evidence_image_url').notNullable();
     table.text('evidence_video_url').nullable();
     table.datetime('detected_at').notNullable();
+    table.datetime('due_date').nullable();
     table.enum('status', ['AI_PENDING', 'OFFICER_VERIFIED', 'REJECTED', 'INVOICED']).notNullable().defaultTo('AI_PENDING');
     table.text('rejection_reason').nullable();
     table.string('verified_by', 36).nullable().references('id').inTable('users').onDelete('SET NULL');

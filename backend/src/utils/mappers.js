@@ -36,6 +36,10 @@ function mapVehicle(row) {
     color: row.color,
     chassisNumber: row.chassis_number,
     engineNumber: row.engine_number,
+    insuranceNumber: row.insurance_number,
+    verificationStatus: row.verification_status,
+    citizenFeedback: row.citizen_feedback,
+    verifiedAt: toIso(row.verified_at),
     registeredAt: toDateOnly(row.registered_at),
     createdAt: toIso(row.created_at),
     updatedAt: toIso(row.updated_at),
@@ -54,6 +58,12 @@ function mapOwner(row) {
     nationalId: row.national_id,
     email: row.email,
     phone: row.phone,
+    dateOfBirth: toDateOnly(row.date_of_birth),
+    gender: row.gender ?? null,
+    address: row.address ?? null,
+    ward: row.ward ?? null,
+    city: row.city ?? null,
+    province: row.province ?? null,
     role: row.role,
     status: row.status,
     createdAt: toIso(row.created_at),
@@ -70,19 +80,56 @@ function mapCamera(row) {
   };
 }
 
+function toNumber(value) {
+  if (value === null || value === undefined || value === '') return null;
+  const n = Number(value);
+  return Number.isFinite(n) ? n : null;
+}
+
 function mapViolation(row) {
+  const defaultAmount = toNumber(row.default_amount);
   return {
     id: row.id,
     cameraId: row.camera_id,
     vehicleId: row.vehicle_id,
     detectedPlateText: row.detected_plate_text,
-    licensePlate: row.license_plate || row.detected_plate_text,
+    correctedPlateText: row.corrected_plate_text ?? null,
+    licensePlate: row.license_plate || row.corrected_plate_text || row.detected_plate_text,
+    ocrConfidence: toNumber(row.ocr_confidence) ?? 0,
     violationType: row.violation_type,
     evidenceImageUrl: row.evidence_image_url,
+    evidenceVideoUrl: row.evidence_video_url ?? null,
     detectedAt: toIso(row.detected_at),
     dueDate: toIso(row.due_date),
     status: row.status,
-    cameraLocation: row.location_name || null,
+    source: row.source || 'AI',
+    rejectionReason: row.rejection_reason ?? null,
+    verifiedBy: row.verified_by ?? null,
+    verifiedAt: toIso(row.verified_at),
+    createdAt: toIso(row.created_at),
+    updatedAt: toIso(row.updated_at),
+    vehicleType: row.vehicle_type_name || row.vehicle_type || null,
+    brand: row.brand || null,
+    model: row.model || null,
+    color: row.color || null,
+    cameraLocation: row.camera_location || row.location_name || null,
+    roadSegment: row.road_segment || null,
+    cameraCode: row.camera_code || null,
+    ownerName: row.owner_name || null,
+    ownerNationalId: row.owner_national_id || null,
+    ownerPhone: row.owner_phone || null,
+    ownerEmail: row.owner_email || null,
+    ownerAddress: row.owner_address || null,
+    fineTitle: row.fine_title || null,
+    fineDescription: row.fine_description || null,
+    fineMinAmount: toNumber(row.min_amount),
+    fineMaxAmount: toNumber(row.max_amount),
+    fineDefaultAmount: defaultAmount,
+    defaultAmount,
+    minAmount: toNumber(row.min_amount),
+    maxAmount: toNumber(row.max_amount),
+    verifiedByName: row.verified_by_name || null,
+    verifiedByBadge: row.verified_by_badge || null,
   };
 }
 

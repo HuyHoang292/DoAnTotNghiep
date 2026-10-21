@@ -8,7 +8,11 @@ export type ViolationType =
 
 export type ViolationStatus = 'AI_PENDING' | 'OFFICER_VERIFIED' | 'REJECTED' | 'INVOICED'
 
+export type ViolationSource = 'AI' | 'OFFICER'
+
 export type InvoiceStatus = 'UNPAID' | 'PAID' | 'OVERDUE' | 'CANCELLED'
+
+export type VehicleVerificationStatus = 'PENDING' | 'APPROVED' | 'REJECTED' | 'REVISION_REQUESTED'
 
 export type Vehicle = {
   id: string
@@ -21,7 +25,11 @@ export type Vehicle = {
   color: string
   chassisNumber?: string | null
   engineNumber?: string | null
+  insuranceNumber?: string | null
   registeredAt?: string | null
+  verificationStatus?: VehicleVerificationStatus
+  citizenFeedback?: string | null
+  verifiedAt?: string | null
   createdAt?: string | null
   updatedAt?: string | null
   ownerName?: string | null
@@ -36,10 +44,18 @@ export type VehicleOwner = {
   nationalId: string
   email: string | null
   phone: string
+  dateOfBirth?: string | null
+  gender?: string | null
+  address?: string | null
+  ward?: string | null
+  city?: string | null
+  province?: string | null
   role?: string
   status?: string
   createdAt?: string | null
   updatedAt?: string | null
+  passwordChanged?: boolean
+  mustChangePassword?: boolean
 }
 
 export type Camera = {
@@ -54,13 +70,25 @@ export type Violation = {
   cameraId: string
   vehicleId: string | null
   detectedPlateText: string
+  correctedPlateText?: string | null
   licensePlate?: string
+  ocrConfidence: number
   violationType: ViolationType
   evidenceImageUrl: string
+  evidenceVideoUrl?: string | null
   detectedAt: string
   dueDate?: string | null
   status: ViolationStatus
+  source?: ViolationSource
+  rejectionReason?: string | null
+  verifiedBy?: string | null
+  verifiedAt?: string | null
   cameraLocation?: string | null
+  fineTitle?: string | null
+  fineDescription?: string | null
+  fineMinAmount?: number | null
+  fineMaxAmount?: number | null
+  fineDefaultAmount?: number | null
 }
 
 export type Invoice = {
@@ -87,4 +115,16 @@ export const VIOLATION_STATUS_LABEL: Record<ViolationStatus, string> = {
   OFFICER_VERIFIED: 'Đã xác nhận',
   REJECTED: 'Đã bác bỏ',
   INVOICED: 'Đã lập biên lai',
+}
+
+export const VIOLATION_SOURCE_LABEL: Record<ViolationSource, string> = {
+  AI: 'AI phát hiện',
+  OFFICER: 'Cán bộ ghi nhận',
+}
+
+export const VEHICLE_VERIFICATION_STATUS_LABEL: Record<VehicleVerificationStatus, string> = {
+  PENDING: 'Chờ duyệt',
+  APPROVED: 'Đã duyệt',
+  REJECTED: 'Đã từ chối',
+  REVISION_REQUESTED: 'Yêu cầu sửa',
 }

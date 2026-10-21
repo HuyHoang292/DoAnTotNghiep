@@ -6,6 +6,7 @@ exports.up = function(knex) {
     table.string('email', 100).unique();
     table.string('phone', 20).notNullable().unique();
     table.string('password_hash', 255).notNullable();
+    table.date('date_of_birth').nullable();
     table.enum('role', ['CITIZEN', 'OFFICER', 'ADMIN']).notNullable().defaultTo('CITIZEN');
     table.enum('status', ['ACTIVE', 'INACTIVE', 'SUSPENDED']).notNullable().defaultTo('ACTIVE');
     table.string('badge_number', 50).nullable();

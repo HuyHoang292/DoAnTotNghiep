@@ -13,11 +13,14 @@ export type AuthUser = {
   role: 'CITIZEN' | 'OFFICER' | 'ADMIN'
   badgeNumber?: string | null
   unit?: string
+  dateOfBirth?: string | null
   gender?: 'MALE' | 'FEMALE' | 'OTHER' | null
   address?: string | null
   ward?: string | null
   city?: string | null
   province?: string | null
+  passwordChanged?: boolean
+  mustChangePassword?: boolean
 }
 
 export function getToken(): string | null {
@@ -80,10 +83,10 @@ export async function getMeRequest() {
   return apiFetch<{ user: AuthUser }>('/api/auth/me')
 }
 
-export async function changePasswordRequest(oldPassword: string, newPassword: string) {
+export async function changePasswordRequest(data: { oldPassword: string; newPassword: string }) {
   return apiFetch<{ message: string }>('/api/auth/change-password', {
     method: 'PATCH',
-    body: JSON.stringify({ oldPassword, newPassword }),
+    body: JSON.stringify(data),
   })
 }
 
@@ -171,6 +174,12 @@ export async function createCitizenRequest(payload: {
   nationalId: string
   email: string
   phone: string
+  dateOfBirth?: string
+  gender?: string
+  address?: string
+  ward?: string
+  city?: string
+  province?: string
 }) {
   return apiFetch<{ user: VehicleOwner; temporaryPassword?: string; message?: string }>(
     '/api/officer/citizens',
@@ -180,7 +189,18 @@ export async function createCitizenRequest(payload: {
 
 export async function updateCitizenRequest(
   id: string,
-  payload: { fullName?: string; nationalId?: string; email?: string; phone?: string },
+  payload: {
+    fullName?: string
+    nationalId?: string
+    email?: string
+    phone?: string
+    dateOfBirth?: string
+    gender?: string
+    address?: string
+    ward?: string
+    city?: string
+    province?: string
+  },
 ) {
   return apiFetch<{ user: VehicleOwner }>(`/api/officer/citizens/${id}`, {
     method: 'PATCH',
@@ -199,6 +219,7 @@ export async function createVehicleRequest(payload: {
   brand?: string
   model?: string
   color?: string
+  insuranceNumber?: string
   registeredAt: string
   plateColor?: string
 }) {
@@ -217,6 +238,7 @@ export async function updateVehicleRequest(
     brand?: string
     model?: string
     color?: string
+    insuranceNumber?: string
     registeredAt?: string
     plateColor?: string
   },
@@ -231,5 +253,149 @@ export async function transferVehicleRequest(id: string, ownerId: string) {
   return apiFetch<{ vehicle: Vehicle; message?: string }>(`/api/officer/vehicles/${id}/transfer`, {
     method: 'POST',
     body: JSON.stringify({ ownerId }),
+  })
+}
+
+export async function approveVehicleRequest(id: string) {
+  return apiFetch<{ vehicle: Vehicle; message?: string }>(`/api/citizen/vehicles/${id}/approve`, {
+    method: 'POST',
+  })
+}
+
+export async function requestVehicleRevisionRequest(id: string, feedback: string) {
+  return apiFetch<{ vehicle: Vehicle; message?: string }>(`/api/citizen/vehicles/${id}/request-revision`, {
+    method: 'POST',
+    body: JSON.stringify({ feedback }),
+  })
+}
+
+export async function rejectVehicleRequest(id: string, feedback: string) {
+  return apiFetch<{ vehicle: Vehicle; message?: string }>(`/api/citizen/vehicles/${id}/reject`, {
+    method: 'POST',
+    body: JSON.stringify({ feedback }),
+  })
+}
+
+// ============ VIOLATIONS API ============
+
+export type ViolationDetail = Violation & {
+  licensePlate?: string
+  vehicleType?: string
+  brand?: string
+  model?: string
+  color?: string
+  cameraLocation?: string
+  roadSegment?: string
+  cameraCode?: string
+  ownerName?: string
+  ownerNationalId?: string
+  ownerPhone?: string
+  ownerEmail?: string
+  ownerAddress?: string
+  fineTitle?: string
+  fineDescription?: string
+  minAmount?: number
+  maxAmount?: number
+  defaultAmount?: number
+  verifiedByName?: string
+  verifiedByBadge?: string
+}
+
+export type ViolationHistory = {
+  action: string
+  timestamp: string
+  actor: string
+  note?: string | null
+}
+
+export type ViolationsQueryParams = {
+  status?: string
+  violationType?: string
+  cameraId?: string
+  plate?: string
+  startDate?: string
+  endDate?: string
+  source?: string
+  page?: number
+  limit?: number
+}
+
+export async function getOfficerViolations(params: ViolationsQueryParams = {}) {
+  const query = new URLSearchParams()
+  Object.entries(params).forEach(([key, value]) => {
+    if (value !== undefined && value !== null && value !== '') {
+      query.append(key, String(value))
+    }
+  })
+  
+  return apiFetch<{
+    violations: ViolationDetail[]
+    pagination: {
+      page: number
+      limit: number
+      total: number
+      totalPages: number
+    }
+  }>(`/api/officer/violations?${query.toString()}`)
+}
+
+export async function getViolationDetail(id: string) {
+  return apiFetch<{
+    violation: ViolationDetail
+    invoice: Invoice | null
+    history: ViolationHistory[]
+  }>(`/api/officer/violations/${id}`)
+}
+
+export async function verifyViolation(id: string, data: { correctedPlate?: string; vehicleId?: string }) {
+  return apiFetch<{ violation: Violation; message: string }>(`/api/officer/violations/${id}/verify`, {
+    method: 'POST',
+    body: JSON.stringify(data),
+  })
+}
+
+export async function rejectViolation(id: string, reason: string) {
+  return apiFetch<{ violation: Violation; message: string }>(`/api/officer/violations/${id}/reject`, {
+    method: 'POST',
+    body: JSON.stringify({ reason }),
+  })
+}
+
+export async function updateViolationPlate(id: string, correctedPlateText: string) {
+  return apiFetch<{ violation: Violation; vehicle?: Vehicle; message: string }>(
+    `/api/officer/violations/${id}/plate`,
+    {
+      method: 'PATCH',
+      body: JSON.stringify({ correctedPlateText }),
+    }
+  )
+}
+
+export async function createInvoiceFromViolation(id: string, data?: { amount?: number; dueDate?: string }) {
+  return apiFetch<{ invoice: Invoice; violation: Violation; message: string }>(
+    `/api/officer/violations/${id}/invoice`,
+    {
+      method: 'POST',
+      body: JSON.stringify(data || {}),
+    }
+  )
+}
+
+export async function getAIQueue(sortBy: 'time' | 'confidence' = 'time') {
+  return apiFetch<{ violations: ViolationDetail[]; total: number }>(
+    `/api/officer/violations/queue?sortBy=${sortBy}`
+  )
+}
+
+export async function createOfficerViolationRequest(data: {
+  plate: string
+  violationType: string
+  cameraId?: string
+  detectedAt?: string
+  evidenceImageUrl?: string
+}) {
+  return apiFetch<{ violation: ViolationDetail; message: string }>('/api/officer/violations', {
+    method: 'POST',
+    body: JSON.stringify(data),
   })
 }

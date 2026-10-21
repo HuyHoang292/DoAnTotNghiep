@@ -16,8 +16,54 @@ exports.seed = async function (knex) {
 
   // 2. Chèn Mức phạt (fines)
   await knex('fines').insert([
-    { violation_type: 'RED_LIGHT', title: 'Vượt đèn đỏ / đèn vàng', default_amount: 5000000.00, min_amount: 4000000, max_amount: 6000000 },
-    { violation_type: 'WRONG_LANE', title: 'Đi sai làn đường', default_amount: 4000000.00, min_amount: 3000000, max_amount: 5000000 }
+    {
+      violation_type: 'RED_LIGHT',
+      title: 'Vượt đèn đỏ / đèn vàng',
+      description: 'Điều khiển phương tiện vượt qua hiệu lệnh đèn tín hiệu giao thông (đèn đỏ hoặc đèn vàng)',
+      min_amount: 4000000.00,
+      max_amount: 6000000.00,
+      default_amount: 5000000.00,
+    },
+    {
+      violation_type: 'WRONG_LANE',
+      title: 'Đi sai làn đường',
+      description: 'Điều khiển phương tiện không đúng phần đường, làn đường quy định',
+      min_amount: 800000.00,
+      max_amount: 1200000.00,
+      default_amount: 1000000.00,
+    },
+    {
+      violation_type: 'SPEEDING',
+      title: 'Chạy quá tốc độ',
+      description: 'Điều khiển phương tiện chạy quá tốc độ quy định',
+      min_amount: 2000000.00,
+      max_amount: 4000000.00,
+      default_amount: 3000000.00,
+    },
+    {
+      violation_type: 'ILLEGAL_PARKING',
+      title: 'Đỗ xe trái quy định',
+      description: 'Dừng, đỗ xe không đúng nơi quy định',
+      min_amount: 400000.00,
+      max_amount: 1000000.00,
+      default_amount: 800000.00,
+    },
+    {
+      violation_type: 'HELMET_LESS',
+      title: 'Không đội mũ bảo hiểm',
+      description: 'Người điều khiển, người ngồi trên xe mô tô không đội mũ bảo hiểm',
+      min_amount: 200000.00,
+      max_amount: 400000.00,
+      default_amount: 300000.00,
+    },
+    {
+      violation_type: 'WRONG_WAY',
+      title: 'Đi ngược chiều',
+      description: 'Điều khiển phương tiện đi ngược chiều của đường một chiều',
+      min_amount: 4000000.00,
+      max_amount: 6000000.00,
+      default_amount: 5000000.00,
+    },
   ]);
 
   // 3. Chèn Người dùng (users) - 1 Admin, 1 Officer, 3 Citizens
@@ -33,6 +79,7 @@ exports.seed = async function (knex) {
       phone: '0901000001',
       password_hash: defaultPasswordHash,
       gender: 'MALE',
+      date_of_birth: '1990-01-01',
       address: 'Số 1 Lê Duẩn',
       ward: 'Bến Nghé',
       city: 'Quận 1',
@@ -49,6 +96,7 @@ exports.seed = async function (knex) {
       phone: '0901111222',
       password_hash: defaultPasswordHash,
       gender: 'MALE',
+      date_of_birth: '1985-05-15',
       address: 'Số 25 Trần Hưng Đạo',
       ward: 'Cửa Nam',
       city: 'Quận Hoàn Kiếm',
@@ -65,12 +113,15 @@ exports.seed = async function (knex) {
       phone: '0988888999',
       password_hash: defaultPasswordHash,
       gender: 'MALE',
+      date_of_birth: '1995-10-20',
       address: '123 Nguyễn Văn Linh',
       ward: 'Nam Dương',
       city: 'Quận Hải Châu',
       province: 'Đà Nẵng',
       role: 'CITIZEN',
-      status: 'ACTIVE'
+      status: 'ACTIVE',
+      must_change_password: true,
+      password_changed: false
     },
     {
       id: 'usr-mai-002',
@@ -80,12 +131,15 @@ exports.seed = async function (knex) {
       phone: '0977666555',
       password_hash: defaultPasswordHash,
       gender: 'FEMALE',
+      date_of_birth: '1998-12-05',
       address: '456 Điện Biên Phủ',
       ward: 'Phường 25',
       city: 'Quận Bình Thạnh',
       province: 'TP. Hồ Chí Minh',
       role: 'CITIZEN',
-      status: 'ACTIVE'
+      status: 'ACTIVE',
+      must_change_password: true,
+      password_changed: false
     },
     {
       id: 'usr-hung-003',
@@ -95,12 +149,15 @@ exports.seed = async function (knex) {
       phone: '0933222111',
       password_hash: defaultPasswordHash,
       gender: 'MALE',
+      date_of_birth: '1992-03-22',
       address: '789 Láng Hạ',
       ward: 'Láng Hạ',
       city: 'Quận Đống Đa',
       province: 'Hà Nội',
       role: 'CITIZEN',
-      status: 'ACTIVE'
+      status: 'ACTIVE',
+      must_change_password: true,
+      password_changed: false
     }
   ]);
 
@@ -123,6 +180,13 @@ exports.seed = async function (knex) {
       longitude: 105.842341,
       road_segment: 'Quận Ba Đình, Hà Nội',
       status: 'ONLINE'
+    },
+    {
+      id: 'cam-officer-manual',
+      camera_code: 'OFFICER_MANUAL',
+      location_name: 'Ghi nhận trực tiếp bởi cán bộ',
+      road_segment: 'Hiện trường',
+      status: 'ONLINE'
     }
   ]);
 
@@ -130,13 +194,8 @@ exports.seed = async function (knex) {
   const vehiclesData = [
     { id: 'veh-dan-01', license_plate: '30F-123.45', owner_id: 'usr-dan-001', vehicle_type: 'CAR', brand: 'Toyota', model: 'Camry', color: 'Đen', registered_at: '2023-01-15' },
     { id: 'veh-dan-02', license_plate: '29A-888.99', owner_id: 'usr-dan-001', vehicle_type: 'MOTORBIKE', brand: 'Honda', model: 'SH 150i', color: 'Trắng', registered_at: '2023-05-20' },
-    { id: 'veh-dan-03', license_plate: '30H-999.99', owner_id: 'usr-dan-001', vehicle_type: 'CAR', brand: 'Mercedes-Benz', model: 'E300', color: 'Đỏ', registered_at: '2024-02-10' },
-    { id: 'veh-dan-04', license_plate: '30K-555.66', owner_id: 'usr-dan-001', vehicle_type: 'CAR', brand: 'Hyundai', model: 'SantaFe', color: 'Xanh', registered_at: '2024-08-12' },
-    { id: 'veh-dan-05', license_plate: '29C-111.22', owner_id: 'usr-dan-001', vehicle_type: 'TRUCK', brand: 'Ford', model: 'Ranger', color: 'Ghi', registered_at: '2025-01-05' },
     { id: 'veh-mai-01', license_plate: '51G-777.88', owner_id: 'usr-mai-002', vehicle_type: 'CAR', brand: 'Mazda', model: 'CX-5', color: 'Trắng', registered_at: '2023-11-11' },
-    { id: 'veh-mai-02', license_plate: '59P1-123.45', owner_id: 'usr-mai-002', vehicle_type: 'MOTORBIKE', brand: 'Yamaha', model: 'Grande', color: 'Đỏ', registered_at: '2024-03-15' },
-    { id: 'veh-hung-01', license_plate: '43A-333.44', owner_id: 'usr-hung-003', vehicle_type: 'CAR', brand: 'Kia', model: 'K3', color: 'Xám', registered_at: '2023-09-09' },
-    { id: 'veh-hung-02', license_plate: '43S1-666.77', owner_id: 'usr-hung-003', vehicle_type: 'MOTORBIKE', brand: 'Honda', model: 'AirBlade', color: 'Đen', registered_at: '2024-06-01' }
+    { id: 'veh-hung-01', license_plate: '43A-333.44', owner_id: 'usr-hung-003', vehicle_type: 'CAR', brand: 'Kia', model: 'K3', color: 'Xám', registered_at: '2023-09-09' }
   ].map(v => ({ ...v, plate_color: 'WHITE' }));
 
   await knex('vehicles').insert(vehiclesData);
@@ -145,7 +204,7 @@ exports.seed = async function (knex) {
   const violations = [];
   const invoices = [];
 
-  const createViolationAndInvoice = (id, vehId, plate, camId, type, dateStr, dueDateStr, status, invStatus = null, amount = 5000000) => {
+  const createViolationAndInvoice = (id, vehId, plate, camId, dateStr, dueDateStr, status, invStatus = null, amount = 5000000) => {
     violations.push({
       id: id,
       camera_id: camId,
@@ -153,11 +212,12 @@ exports.seed = async function (knex) {
       detected_plate_text: plate,
       corrected_plate_text: plate,
       ocr_confidence: 0.95,
-      violation_type: type,
+      violation_type: 'RED_LIGHT', // Tham chiếu đến bảng fines
       evidence_image_url: `https://picsum.photos/seed/${id}/400/300`,
       detected_at: dateStr,
       due_date: dueDateStr,
       status: status,
+      source: 'AI',
       verified_by: status !== 'AI_PENDING' ? 'usr-officer-001' : null,
       verified_at: status !== 'AI_PENDING' ? dateStr : null
     });
@@ -176,33 +236,62 @@ exports.seed = async function (knex) {
     }
   };
 
-  // --- 15 VI PHẠM CHO TRẦN VĂN DẦN ---
-  createViolationAndInvoice('vio-dan-1a', 'veh-dan-01', '30F-123.45', 'cam-001', 'RED_LIGHT', '2026-09-01 08:30:00', '2026-09-15 08:30:00', 'INVOICED', 'OVERDUE', 5000000);
-  createViolationAndInvoice('vio-dan-1b', 'veh-dan-01', '30F-123.45', 'cam-002', 'WRONG_LANE', '2026-09-10 14:20:00', '2026-09-25 14:20:00', 'INVOICED', 'UNPAID', 4000000);
-  createViolationAndInvoice('vio-dan-1c', 'veh-dan-01', '30F-123.45', 'cam-001', 'SPEEDING', '2026-09-12 18:00:00', '2026-09-27 18:00:00', 'AI_PENDING');
+  // --- VI PHẠM CHO CÁC XE ---
+  // AI_PENDING - chờ xác minh
+  createViolationAndInvoice('vio-pending-01', 'veh-dan-01', '30F-123.45', 'cam-001', '2026-10-20 08:30:00', '2026-11-04 08:30:00', 'AI_PENDING');
+  createViolationAndInvoice('vio-pending-02', 'veh-mai-01', '51G-777.88', 'cam-002', '2026-10-20 09:15:00', '2026-11-04 09:15:00', 'AI_PENDING');
+  createViolationAndInvoice('vio-pending-03', 'veh-hung-01', '43A-333.44', 'cam-001', '2026-10-20 10:00:00', '2026-11-04 10:00:00', 'AI_PENDING');
+  createViolationAndInvoice('vio-pending-04', 'veh-dan-02', '29A-888.99', 'cam-002', '2026-10-20 14:30:00', '2026-11-04 14:30:00', 'AI_PENDING');
+  
+  // OFFICER_VERIFIED - đã xác minh chưa phát hóa đơn
+  createViolationAndInvoice('vio-verified-01', 'veh-dan-01', '30F-123.45', 'cam-001', '2026-10-18 08:00:00', '2026-11-02 08:00:00', 'OFFICER_VERIFIED');
+  createViolationAndInvoice('vio-verified-02', 'veh-mai-01', '51G-777.88', 'cam-002', '2026-10-18 11:30:00', '2026-11-02 11:30:00', 'OFFICER_VERIFIED');
+  
+  // REJECTED - bị từ chối
+  violations.push({
+    id: 'vio-rejected-01',
+    camera_id: 'cam-001',
+    vehicle_id: null,
+    detected_plate_text: 'UNCLEAR',
+    corrected_plate_text: null,
+    ocr_confidence: 0.45,
+    violation_type: 'RED_LIGHT',
+    evidence_image_url: 'https://picsum.photos/seed/vio-rejected-01/400/300',
+    detected_at: '2026-10-19 15:00:00',
+    due_date: null,
+    status: 'REJECTED',
+    source: 'AI',
+    rejection_reason: 'Ảnh mờ, không nhận diện được biển số rõ ràng',
+    verified_by: 'usr-officer-001',
+    verified_at: '2026-10-19 16:00:00'
+  });
+  
+  // INVOICED - đã phát hành hóa đơn
+  createViolationAndInvoice('vio-dan-1a', 'veh-dan-01', '30F-123.45', 'cam-001', '2026-09-01 08:30:00', '2026-09-15 08:30:00', 'INVOICED', 'OVERDUE', 5000000);
+  createViolationAndInvoice('vio-dan-1b', 'veh-dan-01', '30F-123.45', 'cam-002', '2026-09-10 14:20:00', '2026-09-25 14:20:00', 'INVOICED', 'UNPAID', 5000000);
+  createViolationAndInvoice('vio-dan-2a', 'veh-dan-02', '29A-888.99', 'cam-002', '2026-08-20 09:10:00', '2026-09-05 09:10:00', 'INVOICED', 'PAID', 5000000);
+  createViolationAndInvoice('vio-mai-1a', 'veh-mai-01', '51G-777.88', 'cam-001', '2026-09-02 08:00:00', '2026-09-17 08:00:00', 'INVOICED', 'OVERDUE', 5000000);
+  createViolationAndInvoice('vio-hung-1a', 'veh-hung-01', '43A-333.44', 'cam-001', '2026-09-06 14:00:00', '2026-09-21 14:00:00', 'INVOICED', 'UNPAID', 5000000);
 
-  createViolationAndInvoice('vio-dan-2a', 'veh-dan-02', '29A-888.99', 'cam-002', 'HELMET_LESS', '2026-08-20 09:10:00', '2026-09-05 09:10:00', 'INVOICED', 'PAID', 500000);
-  createViolationAndInvoice('vio-dan-2b', 'veh-dan-02', '29A-888.99', 'cam-001', 'RED_LIGHT', '2026-09-02 11:40:00', '2026-09-16 11:40:00', 'INVOICED', 'OVERDUE', 5000000);
-  createViolationAndInvoice('vio-dan-2c', 'veh-dan-02', '29A-888.99', 'cam-002', 'WRONG_WAY', '2026-09-11 16:15:00', '2026-09-26 16:15:00', 'OFFICER_VERIFIED');
-
-  createViolationAndInvoice('vio-dan-3a', 'veh-dan-03', '30H-999.99', 'cam-001', 'SPEEDING', '2026-08-25 21:00:00', '2026-09-09 21:00:00', 'INVOICED', 'OVERDUE', 5000000);
-  createViolationAndInvoice('vio-dan-3b', 'veh-dan-03', '30H-999.99', 'cam-002', 'ILLEGAL_PARKING', '2026-09-05 10:30:00', '2026-09-20 10:30:00', 'INVOICED', 'UNPAID', 900000);
-  createViolationAndInvoice('vio-dan-3c', 'veh-dan-03', '30H-999.99', 'cam-001', 'RED_LIGHT', '2026-09-13 07:45:00', '2026-09-28 07:45:00', 'REJECTED');
-
-  createViolationAndInvoice('vio-dan-4a', 'veh-dan-04', '30K-555.66', 'cam-002', 'WRONG_LANE', '2026-09-03 15:00:00', '2026-09-18 15:00:00', 'INVOICED', 'OVERDUE', 4000000);
-  createViolationAndInvoice('vio-dan-4b', 'veh-dan-04', '30K-555.66', 'cam-001', 'SPEEDING', '2026-09-08 13:20:00', '2026-09-23 13:20:00', 'INVOICED', 'UNPAID', 5000000);
-  createViolationAndInvoice('vio-dan-4c', 'veh-dan-04', '30K-555.66', 'cam-002', 'RED_LIGHT', '2026-09-12 17:10:00', '2026-09-27 17:10:00', 'AI_PENDING');
-
-  createViolationAndInvoice('vio-dan-5a', 'veh-dan-05', '29C-111.22', 'cam-001', 'WRONG_WAY', '2026-09-04 09:00:00', '2026-09-19 09:00:00', 'INVOICED', 'OVERDUE', 4000000);
-  createViolationAndInvoice('vio-dan-5b', 'veh-dan-05', '29C-111.22', 'cam-002', 'ILLEGAL_PARKING', '2026-09-07 11:00:00', '2026-09-22 11:00:00', 'INVOICED', 'PAID', 900000);
-  createViolationAndInvoice('vio-dan-5c', 'veh-dan-05', '29C-111.22', 'cam-001', 'WRONG_LANE', '2026-09-10 16:30:00', '2026-09-25 16:30:00', 'OFFICER_VERIFIED');
-
-  createViolationAndInvoice('vio-mai-1a', 'veh-mai-01', '51G-777.88', 'cam-001', 'RED_LIGHT', '2026-09-02 08:00:00', '2026-09-17 08:00:00', 'INVOICED', 'OVERDUE', 5000000);
-  createViolationAndInvoice('vio-mai-2a', 'veh-mai-02', '59P1-123.45', 'cam-002', 'HELMET_LESS', '2026-09-09 10:00:00', '2026-09-24 10:00:00', 'INVOICED', 'UNPAID', 500000);
-  createViolationAndInvoice('vio-hung-1a', 'veh-hung-01', '43A-333.44', 'cam-001', 'SPEEDING', '2026-09-06 14:00:00', '2026-09-21 14:00:00', 'INVOICED', 'UNPAID', 5000000);
+  violations.push({
+    id: 'vio-officer-01',
+    camera_id: 'cam-officer-manual',
+    vehicle_id: 'veh-dan-01',
+    detected_plate_text: '30F-123.45',
+    corrected_plate_text: '30F-123.45',
+    ocr_confidence: 1,
+    violation_type: 'WRONG_LANE',
+    evidence_image_url: 'https://picsum.photos/seed/vio-officer-01/400/300',
+    detected_at: '2026-10-21 07:45:00',
+    due_date: '2026-11-05 07:45:00',
+    status: 'OFFICER_VERIFIED',
+    source: 'OFFICER',
+    verified_by: 'usr-officer-001',
+    verified_at: '2026-10-21 07:45:00',
+  });
 
   await knex('violations').insert(violations);
   await knex('invoices').insert(invoices);
 
-  console.log('✅ Đã nạp thành công bộ dữ liệu chuẩn kèm thông tin chi tiết địa chỉ và giới tính!');
+  console.log('✅ Đã nạp thành công bộ dữ liệu thử!');
 };
