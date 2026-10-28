@@ -4,6 +4,7 @@ const nodemailer = require('nodemailer');
 const db = require('../db/knex');
 const { mapVehicle, mapOwner, mapCamera, mapViolation, mapInvoice } = require('../utils/mappers');
 const { normalizePlate, recognizePlateFromImage } = require('../services/plateRecognition');
+const { uploadImage, isDataUrlImage, isStoredImageUrl, isStoredVideoUrl } = require('../services/imageStorage');
 
 // Cấu hình dịch vụ gửi email tự động
 const transporter = nodemailer.createTransport({
@@ -187,6 +188,75 @@ exports.scanPlate = async (req, res) => {
     return res.status(500).json({
       message: error.message || 'Không thể nhận diện biển số.',
     });
+  }
+};
+
+// Tải ảnh biển số lên Cloudinary và cho AI service đọc biển số cùng lúc.
+// Đọc biển số thất bại vẫn trả về URL ảnh để cán bộ tự nhập tay.
+exports.uploadPlateImage = async (req, res) => {
+  try {
+    const image = req.body?.image;
+    const purpose = req.body?.purpose === 'vehicles' ? 'vehicles' : 'violations';
+    if (!isDataUrlImage(image)) {
+      return res.status(400).json({ message: 'Ảnh không hợp lệ (chỉ hỗ trợ JPG, PNG, WEBP).' });
+    }
+
+    const [uploaded, recognized] = await Promise.allSettled([
+      uploadImage(image, { subfolder: purpose }),
+      recognizePlateFromImage(image),
+    ]);
+
+    if (uploaded.status === 'rejected') {
+      console.error('Upload plate image error:', uploaded.reason);
+      return res.status(502).json({
+        message: `Không tải được ảnh lên kho lưu trữ: ${uploaded.reason?.message || 'lỗi không xác định'}`,
+      });
+    }
+
+    const result = recognized.status === 'fulfilled' ? recognized.value : null;
+    const plateText = result?.plateText || '';
+    let message = '';
+    if (recognized.status === 'rejected') {
+      const reason = String(recognized.reason?.message || 'AI service lỗi').replace(/\.+$/, '');
+      message = `Đã lưu ảnh nhưng chưa đọc được biển số: ${reason}. Hãy nhập tay.`;
+    } else if (!plateText) {
+      message = result?.rawText
+        ? `Đọc được "${result.rawText}" nhưng chưa khớp định dạng biển số Việt Nam. Hãy kiểm tra và sửa lại.`
+        : 'Đã lưu ảnh nhưng không tìm thấy biển số trong ảnh. Hãy nhập tay.';
+    }
+
+    return res.json({
+      imageUrl: uploaded.value.url,
+      plateText,
+      rawText: result?.rawText || '',
+      confidence: result?.confidence || 0,
+      message,
+    });
+  } catch (error) {
+    console.error('Upload plate image error:', error);
+    return res.status(500).json({ message: 'Không thể xử lý ảnh biển số.' });
+  }
+};
+
+// Gắn / gỡ video mẫu cho camera (videoUrl rỗng = gỡ video)
+exports.updateCameraVideo = async (req, res) => {
+  try {
+    const camera = await db('cameras').where('id', req.params.id).first();
+    if (!camera) {
+      return res.status(404).json({ message: 'Không tìm thấy camera.' });
+    }
+
+    const videoUrl = String(req.body?.videoUrl ?? '').trim();
+    if (videoUrl && !isStoredVideoUrl(videoUrl)) {
+      return res.status(400).json({ message: 'Link video phải là video trên Cloudinary của hệ thống (…/video/upload/…).' });
+    }
+
+    await db('cameras').where('id', camera.id).update({ video_url: videoUrl || null, updated_at: now() });
+    const updated = await db('cameras').where('id', camera.id).first();
+    return res.json({ camera: mapCamera(updated) });
+  } catch (error) {
+    console.error('Update camera video error:', error);
+    return res.status(500).json({ message: 'Không thể cập nhật video camera.' });
   }
 };
 
@@ -419,7 +489,11 @@ exports.createVehicle = async (req, res) => {
     const chassisNumber = String(req.body?.chassisNumber || '').trim() || null;
     const engineNumber = String(req.body?.engineNumber || '').trim() || null;
     const insuranceNumber = String(req.body?.insuranceNumber || '').trim() || null;
+    const plateImageUrl = String(req.body?.plateImageUrl || '').trim();
 
+    if (plateImageUrl && !isStoredImageUrl(plateImageUrl)) {
+      return res.status(400).json({ message: 'Ảnh biển số không hợp lệ. Hãy tải ảnh lên lại.' });
+    }
     if (!licensePlate || !ownerId || !vehicleType || !registeredAt) {
       return res.status(400).json({
         message: 'Vui lòng nhập biển số, loại xe, ngày đăng ký và chọn chủ sở hữu.',
@@ -450,6 +524,7 @@ exports.createVehicle = async (req, res) => {
       chassis_number: chassisNumber,
       engine_number: engineNumber,
       insurance_number: insuranceNumber,
+      plate_image_url: plateImageUrl || null,
       registered_at: registeredAt,
       created_at: now(),
       updated_at: now(),
@@ -485,8 +560,15 @@ exports.updateVehicle = async (req, res) => {
     const engineNumber = String(req.body?.engineNumber ?? '').trim();
     const insuranceNumber = String(req.body?.insuranceNumber ?? '').trim();
     const ownerId = String(req.body?.ownerId ?? '').trim();
+    const plateImageUrl = String(req.body?.plateImageUrl ?? '').trim();
 
     if (licensePlate) patch.license_plate = licensePlate;
+    if (plateImageUrl) {
+      if (!isStoredImageUrl(plateImageUrl)) {
+        return res.status(400).json({ message: 'Ảnh biển số không hợp lệ. Hãy tải ảnh lên lại.' });
+      }
+      patch.plate_image_url = plateImageUrl;
+    }
     if (vehicleType) {
       if (!VEHICLE_TYPES.includes(vehicleType)) {
         return res.status(400).json({ message: 'Loại xe không hợp lệ.' });

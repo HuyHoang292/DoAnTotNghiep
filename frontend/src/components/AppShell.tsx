@@ -1,5 +1,6 @@
 import { Link, Outlet, useNavigate, useRouterState } from '@tanstack/react-router'
 import {
+  BarChart3,
   Bell,
   Car,
   FileText,
@@ -37,7 +38,9 @@ const officerNav = [
   { to: '/officer/citizens',  label: 'Công dân',     icon: Users },
   { to: '/officer/violations', label: 'Vi phạm',      icon: TriangleAlert },
   { to: '/officer/violation_queues', label: 'Hàng đợi AI',  icon: ListChecks },
-  { to: '/officer/dashboard', label: 'Camera',       icon: Video, disabled: true },
+  { to: '/officer/invoices',  label: 'Hóa đơn',      icon: FileText },
+  { to: '/officer/cameras',   label: 'Camera',       icon: Video },
+  { to: '/officer/reports',   label: 'Báo cáo',      icon: BarChart3 },
 ]
 
 export function AppShell({

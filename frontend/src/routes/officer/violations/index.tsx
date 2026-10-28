@@ -19,6 +19,7 @@ import {
   type ViolationType,
 } from '@/lib/types'
 import { Loader2, Plus } from 'lucide-react'
+import { PlateImageUpload } from '@/components/PlateImageUpload'
 
 export const Route = createFileRoute('/officer/violations/')({
   component: OfficerViolations,
@@ -50,6 +51,7 @@ function OfficerViolations() {
     violationType: 'RED_LIGHT' as ViolationType,
     cameraId: 'cam-officer-manual',
     detectedAt: toDatetimeLocalValue(),
+    evidenceImageUrl: '',
   })
 
   const load = async (nextPage = page) => {
@@ -98,6 +100,10 @@ function OfficerViolations() {
   }
 
   const handleCreate = async () => {
+    if (!createForm.evidenceImageUrl) {
+      alert('Vui lòng tải lên ảnh biển số làm bằng chứng')
+      return
+    }
     if (!createForm.plate.trim()) {
       alert('Vui lòng nhập biển số')
       return
@@ -109,6 +115,7 @@ function OfficerViolations() {
         violationType: createForm.violationType,
         cameraId: createForm.cameraId || 'cam-officer-manual',
         detectedAt: createForm.detectedAt ? new Date(createForm.detectedAt).toISOString() : undefined,
+        evidenceImageUrl: createForm.evidenceImageUrl,
       })
       setCreating(false)
       setCreateForm({
@@ -116,6 +123,7 @@ function OfficerViolations() {
         violationType: 'RED_LIGHT',
         cameraId: 'cam-officer-manual',
         detectedAt: toDatetimeLocalValue(),
+        evidenceImageUrl: '',
       })
       await load(1)
       setPage(1)
@@ -431,6 +439,18 @@ function OfficerViolations() {
           onClose={() => setCreating(false)}
         >
           <div className="space-y-3">
+            <PlateImageUpload
+              purpose="violations"
+              label="Ảnh bằng chứng (bắt buộc)"
+              imageUrl={createForm.evidenceImageUrl}
+              onUploaded={(res) =>
+                setCreateForm((f) => ({
+                  ...f,
+                  evidenceImageUrl: res.imageUrl,
+                  plate: res.plateText || f.plate,
+                }))
+              }
+            />
             <label className="block text-sm">
               <span className="mb-1 block font-medium text-slate-700">Biển số</span>
               <input

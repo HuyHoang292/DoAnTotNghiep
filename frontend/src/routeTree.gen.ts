@@ -17,8 +17,11 @@ import { Route as CitizenIndexRouteImport } from './routes/citizen/index'
 import { Route as CitizenDashboardRouteImport } from './routes/citizen/dashboard'
 import { Route as CitizenProfileRouteImport } from './routes/citizen/profile'
 import { Route as OfficerIndexRouteImport } from './routes/officer/index'
+import { Route as OfficerCamerasRouteImport } from './routes/officer/cameras'
 import { Route as OfficerCitizensRouteImport } from './routes/officer/citizens'
 import { Route as OfficerDashboardRouteImport } from './routes/officer/dashboard'
+import { Route as OfficerInvoicesRouteImport } from './routes/officer/invoices'
+import { Route as OfficerReportsRouteImport } from './routes/officer/reports'
 import { Route as OfficerScanRouteImport } from './routes/officer/scan'
 import { Route as OfficerVehiclesRouteImport } from './routes/officer/vehicles'
 import { Route as OfficerViolation_queuesRouteImport } from './routes/officer/violation_queues'
@@ -71,6 +74,11 @@ const OfficerIndexRoute = OfficerIndexRouteImport.update({
   path: '/',
   getParentRoute: () => OfficerRoute,
 } as any)
+const OfficerCamerasRoute = OfficerCamerasRouteImport.update({
+  id: '/cameras',
+  path: '/cameras',
+  getParentRoute: () => OfficerRoute,
+} as any)
 const OfficerCitizensRoute = OfficerCitizensRouteImport.update({
   id: '/citizens',
   path: '/citizens',
@@ -79,6 +87,16 @@ const OfficerCitizensRoute = OfficerCitizensRouteImport.update({
 const OfficerDashboardRoute = OfficerDashboardRouteImport.update({
   id: '/dashboard',
   path: '/dashboard',
+  getParentRoute: () => OfficerRoute,
+} as any)
+const OfficerInvoicesRoute = OfficerInvoicesRouteImport.update({
+  id: '/invoices',
+  path: '/invoices',
+  getParentRoute: () => OfficerRoute,
+} as any)
+const OfficerReportsRoute = OfficerReportsRouteImport.update({
+  id: '/reports',
+  path: '/reports',
   getParentRoute: () => OfficerRoute,
 } as any)
 const OfficerScanRoute = OfficerScanRouteImport.update({
@@ -144,8 +162,11 @@ export interface FileRoutesByFullPath {
   '/officer': typeof OfficerRouteWithChildren
   '/citizen/dashboard': typeof CitizenDashboardRoute
   '/citizen/profile': typeof CitizenProfileRoute
+  '/officer/cameras': typeof OfficerCamerasRoute
   '/officer/citizens': typeof OfficerCitizensRoute
   '/officer/dashboard': typeof OfficerDashboardRoute
+  '/officer/invoices': typeof OfficerInvoicesRoute
+  '/officer/reports': typeof OfficerReportsRoute
   '/officer/scan': typeof OfficerScanRoute
   '/officer/vehicles': typeof OfficerVehiclesRoute
   '/officer/violation_queues': typeof OfficerViolation_queuesRoute
@@ -165,8 +186,11 @@ export interface FileRoutesByTo {
   '/forgot_password': typeof Forgot_passwordRoute
   '/citizen/dashboard': typeof CitizenDashboardRoute
   '/citizen/profile': typeof CitizenProfileRoute
+  '/officer/cameras': typeof OfficerCamerasRoute
   '/officer/citizens': typeof OfficerCitizensRoute
   '/officer/dashboard': typeof OfficerDashboardRoute
+  '/officer/invoices': typeof OfficerInvoicesRoute
+  '/officer/reports': typeof OfficerReportsRoute
   '/officer/scan': typeof OfficerScanRoute
   '/officer/vehicles': typeof OfficerVehiclesRoute
   '/officer/violation_queues': typeof OfficerViolation_queuesRoute
@@ -189,8 +213,11 @@ export interface FileRoutesById {
   '/officer': typeof OfficerRouteWithChildren
   '/citizen/dashboard': typeof CitizenDashboardRoute
   '/citizen/profile': typeof CitizenProfileRoute
+  '/officer/cameras': typeof OfficerCamerasRoute
   '/officer/citizens': typeof OfficerCitizensRoute
   '/officer/dashboard': typeof OfficerDashboardRoute
+  '/officer/invoices': typeof OfficerInvoicesRoute
+  '/officer/reports': typeof OfficerReportsRoute
   '/officer/scan': typeof OfficerScanRoute
   '/officer/vehicles': typeof OfficerVehiclesRoute
   '/officer/violation_queues': typeof OfficerViolation_queuesRoute
@@ -214,8 +241,11 @@ export interface FileRouteTypes {
     | '/officer'
     | '/citizen/dashboard'
     | '/citizen/profile'
+    | '/officer/cameras'
     | '/officer/citizens'
     | '/officer/dashboard'
+    | '/officer/invoices'
+    | '/officer/reports'
     | '/officer/scan'
     | '/officer/vehicles'
     | '/officer/violation_queues'
@@ -235,8 +265,11 @@ export interface FileRouteTypes {
     | '/forgot_password'
     | '/citizen/dashboard'
     | '/citizen/profile'
+    | '/officer/cameras'
     | '/officer/citizens'
     | '/officer/dashboard'
+    | '/officer/invoices'
+    | '/officer/reports'
     | '/officer/scan'
     | '/officer/vehicles'
     | '/officer/violation_queues'
@@ -258,8 +291,11 @@ export interface FileRouteTypes {
     | '/officer'
     | '/citizen/dashboard'
     | '/citizen/profile'
+    | '/officer/cameras'
     | '/officer/citizens'
     | '/officer/dashboard'
+    | '/officer/invoices'
+    | '/officer/reports'
     | '/officer/scan'
     | '/officer/vehicles'
     | '/officer/violation_queues'
@@ -340,6 +376,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof OfficerIndexRouteImport
       parentRoute: typeof OfficerRoute
     }
+    '/officer/cameras': {
+      id: '/officer/cameras'
+      path: '/cameras'
+      fullPath: '/officer/cameras'
+      preLoaderRoute: typeof OfficerCamerasRouteImport
+      parentRoute: typeof OfficerRoute
+    }
     '/officer/citizens': {
       id: '/officer/citizens'
       path: '/citizens'
@@ -352,6 +395,20 @@ declare module '@tanstack/react-router' {
       path: '/dashboard'
       fullPath: '/officer/dashboard'
       preLoaderRoute: typeof OfficerDashboardRouteImport
+      parentRoute: typeof OfficerRoute
+    }
+    '/officer/invoices': {
+      id: '/officer/invoices'
+      path: '/invoices'
+      fullPath: '/officer/invoices'
+      preLoaderRoute: typeof OfficerInvoicesRouteImport
+      parentRoute: typeof OfficerRoute
+    }
+    '/officer/reports': {
+      id: '/officer/reports'
+      path: '/reports'
+      fullPath: '/officer/reports'
+      preLoaderRoute: typeof OfficerReportsRouteImport
       parentRoute: typeof OfficerRoute
     }
     '/officer/scan': {
@@ -462,8 +519,11 @@ const CitizenRouteWithChildren =
   CitizenRoute._addFileChildren(CitizenRouteChildren)
 
 interface OfficerRouteChildren {
+  OfficerCamerasRoute: typeof OfficerCamerasRoute
   OfficerCitizensRoute: typeof OfficerCitizensRoute
   OfficerDashboardRoute: typeof OfficerDashboardRoute
+  OfficerInvoicesRoute: typeof OfficerInvoicesRoute
+  OfficerReportsRoute: typeof OfficerReportsRoute
   OfficerScanRoute: typeof OfficerScanRoute
   OfficerVehiclesRoute: typeof OfficerVehiclesRoute
   OfficerViolation_queuesRoute: typeof OfficerViolation_queuesRoute
@@ -473,8 +533,11 @@ interface OfficerRouteChildren {
 }
 
 const OfficerRouteChildren: OfficerRouteChildren = {
+  OfficerCamerasRoute: OfficerCamerasRoute,
   OfficerCitizensRoute: OfficerCitizensRoute,
   OfficerDashboardRoute: OfficerDashboardRoute,
+  OfficerInvoicesRoute: OfficerInvoicesRoute,
+  OfficerReportsRoute: OfficerReportsRoute,
   OfficerScanRoute: OfficerScanRoute,
   OfficerVehiclesRoute: OfficerVehiclesRoute,
   OfficerViolation_queuesRoute: OfficerViolation_queuesRoute,
