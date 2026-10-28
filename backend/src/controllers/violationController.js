@@ -1,6 +1,7 @@
 const db = require('../db/knex');
 const crypto = require('crypto');
-const { mapViolation } = require('../utils/mappers');
+const { mapViolation, mapInvoice } = require('../utils/mappers');
+const { uploadImage, isDataUrlImage, isStoredImageUrl } = require('../services/imageStorage');
 
 function now() {
   return db.fn.now();
@@ -388,6 +389,43 @@ exports.updatePlate = async (req, res) => {
 };
 
 // Tạo hóa đơn từ vi phạm
+// Huỷ hóa đơn chưa thanh toán, lý do được lưu vào audit_logs
+exports.cancelInvoice = async (req, res) => {
+  try {
+    const reason = String(req.body?.reason || '').trim();
+    if (reason.length < 5) {
+      return res.status(400).json({ message: 'Lý do huỷ tối thiểu 5 ký tự.' });
+    }
+
+    const invoice = await db('invoices').where('id', req.params.id).first();
+    if (!invoice) {
+      return res.status(404).json({ message: 'Không tìm thấy hóa đơn.' });
+    }
+    if (invoice.status !== 'UNPAID' && invoice.status !== 'OVERDUE') {
+      return res.status(400).json({ message: 'Chỉ huỷ được hóa đơn chưa thanh toán.' });
+    }
+
+    await db.transaction(async (trx) => {
+      await trx('invoices').where('id', invoice.id).update({ status: 'CANCELLED', updated_at: now() });
+      await trx('audit_logs').insert({
+        user_id: req.user.id,
+        action: 'CANCEL_INVOICE',
+        target_table: 'invoices',
+        target_id: invoice.id,
+        old_data: JSON.stringify({ status: invoice.status }),
+        new_data: JSON.stringify({ status: 'CANCELLED', reason }),
+        ip_address: req.ip || null,
+      });
+    });
+
+    const updated = await db('invoices').where('id', invoice.id).first();
+    return res.json({ invoice: mapInvoice(updated), message: 'Đã huỷ hóa đơn.' });
+  } catch (error) {
+    console.error('Cancel invoice error:', error);
+    return res.status(500).json({ message: 'Không thể huỷ hóa đơn.' });
+  }
+};
+
 exports.createInvoice = async (req, res) => {
   try {
     const { id } = req.params;
@@ -503,6 +541,7 @@ exports.createOfficerViolation = async (req, res) => {
     const violationType = String(req.body?.violationType || '').trim();
     const cameraId = String(req.body?.cameraId || 'cam-officer-manual').trim();
     const evidenceImageUrl = String(req.body?.evidenceImageUrl || '').trim();
+    const evidenceImage = req.body?.evidenceImage;
     const detectedAt = req.body?.detectedAt ? new Date(req.body.detectedAt) : new Date();
 
     if (!plate) {
@@ -531,6 +570,19 @@ exports.createOfficerViolation = async (req, res) => {
       .first();
 
     const id = crypto.randomUUID();
+
+    // Ảnh đã tải lên trước qua /plate-images (evidenceImageUrl),
+    // hoặc gửi kèm base64 (evidenceImage) — dùng cho luồng camera sau này
+    let imageUrl = '';
+    if (isDataUrlImage(evidenceImage)) {
+      const uploaded = await uploadImage(evidenceImage, { subfolder: 'violations', publicId: id });
+      imageUrl = uploaded.url;
+    } else if (isStoredImageUrl(evidenceImageUrl)) {
+      imageUrl = evidenceImageUrl;
+    } else {
+      return res.status(400).json({ message: 'Vui lòng tải lên ảnh biển số làm bằng chứng vi phạm.' });
+    }
+
     await db('violations').insert({
       id,
       camera_id: camera.id,
@@ -539,7 +591,7 @@ exports.createOfficerViolation = async (req, res) => {
       corrected_plate_text: plate,
       ocr_confidence: 1,
       violation_type: violationType,
-      evidence_image_url: evidenceImageUrl || `https://picsum.photos/seed/${id}/800/500`,
+      evidence_image_url: imageUrl,
       detected_at: Number.isNaN(detectedAt.getTime()) ? new Date() : detectedAt,
       status: 'OFFICER_VERIFIED',
       source: 'OFFICER',

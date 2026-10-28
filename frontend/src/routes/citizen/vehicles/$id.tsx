@@ -189,6 +189,13 @@ function VehicleDetail() {
 
       {/* Thông tin xe */}
       <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+        {vehicle.plateImageUrl && (
+          <img
+            src={vehicle.plateImageUrl}
+            alt={`Ảnh biển số ${vehicle.licensePlate}`}
+            className="mb-4 max-h-64 w-full rounded-xl border border-slate-200 bg-slate-100 object-contain"
+          />
+        )}
         <div className="mb-4">
           <PlateTag value={vehicle.licensePlate} />
         </div>

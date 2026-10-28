@@ -26,6 +26,7 @@ export type Vehicle = {
   chassisNumber?: string | null
   engineNumber?: string | null
   insuranceNumber?: string | null
+  plateImageUrl?: string | null
   registeredAt?: string | null
   verificationStatus?: VehicleVerificationStatus
   citizenFeedback?: string | null
@@ -58,11 +59,24 @@ export type VehicleOwner = {
   mustChangePassword?: boolean
 }
 
+export type CameraStatus = 'ONLINE' | 'OFFLINE' | 'MAINTENANCE'
+
 export type Camera = {
   id: string
+  cameraCode?: string | null
   locationName: string
   roadSegment: string
-  status: 'ONLINE' | 'OFFLINE' | 'MAINTENANCE'
+  latitude?: number | null
+  longitude?: number | null
+  hlsStreamUrl?: string | null
+  videoUrl?: string | null
+  status: CameraStatus
+}
+
+export const CAMERA_STATUS_LABEL: Record<CameraStatus, string> = {
+  ONLINE: 'Hoạt động',
+  OFFLINE: 'Mất kết nối',
+  MAINTENANCE: 'Bảo trì',
 }
 
 export type Violation = {
@@ -99,6 +113,16 @@ export type Invoice = {
   issueDate?: string | null
   dueDate?: string | null
   status: InvoiceStatus
+  paymentMethod?: string | null
+  paidAt?: string | null
+  createdAt?: string | null
+}
+
+export const INVOICE_STATUS_LABEL: Record<InvoiceStatus, string> = {
+  UNPAID: 'Chưa nộp',
+  OVERDUE: 'Quá hạn',
+  PAID: 'Đã nộp',
+  CANCELLED: 'Đã huỷ',
 }
 
 export const VIOLATION_TYPE_LABEL: Record<ViolationType, string> = {

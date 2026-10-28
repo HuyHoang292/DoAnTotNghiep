@@ -165,6 +165,22 @@ export async function scanPlateRequest(image: string) {
   return data as PlateScanResult
 }
 
+export type PlateImageUploadResult = {
+  imageUrl: string
+  plateText: string
+  rawText: string
+  confidence: number
+  message?: string
+}
+
+// Tải ảnh lên Cloudinary (qua backend) và để AI service đọc biển số
+export async function uploadPlateImageRequest(image: string, purpose: 'vehicles' | 'violations') {
+  return apiFetch<PlateImageUploadResult>('/api/officer/plate-images', {
+    method: 'POST',
+    body: JSON.stringify({ image, purpose }),
+  })
+}
+
 export async function listCitizensRequest() {
   return apiFetch<{ users: VehicleOwner[] }>('/api/officer/citizens')
 }
@@ -222,6 +238,7 @@ export async function createVehicleRequest(payload: {
   insuranceNumber?: string
   registeredAt: string
   plateColor?: string
+  plateImageUrl?: string
 }) {
   return apiFetch<{ vehicle: Vehicle }>('/api/officer/vehicles', {
     method: 'POST',
@@ -241,6 +258,7 @@ export async function updateVehicleRequest(
     insuranceNumber?: string
     registeredAt?: string
     plateColor?: string
+    plateImageUrl?: string
   },
 ) {
   return apiFetch<{ vehicle: Vehicle }>(`/api/officer/vehicles/${id}`, {
@@ -379,6 +397,20 @@ export async function createInvoiceFromViolation(id: string, data?: { amount?: n
       body: JSON.stringify(data || {}),
     }
   )
+}
+
+export async function updateCameraVideoRequest(id: string, videoUrl: string) {
+  return apiFetch<{ camera: Camera }>(`/api/officer/cameras/${id}/video`, {
+    method: 'PATCH',
+    body: JSON.stringify({ videoUrl }),
+  })
+}
+
+export async function cancelInvoiceRequest(id: string, reason: string) {
+  return apiFetch<{ invoice: Invoice; message: string }>(`/api/officer/invoices/${id}/cancel`, {
+    method: 'POST',
+    body: JSON.stringify({ reason }),
+  })
 }
 
 export async function getAIQueue(sortBy: 'time' | 'confidence' = 'time') {

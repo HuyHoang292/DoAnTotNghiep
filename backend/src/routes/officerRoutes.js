@@ -9,6 +9,8 @@ router.use(authMiddleware, requireRoles('OFFICER', 'ADMIN'));
 router.get('/dashboard', officerController.getDashboard);
 router.get('/plates', officerController.lookupPlate);
 router.post('/scan-plate', officerController.scanPlate);
+router.post('/plate-images', officerController.uploadPlateImage);
+router.patch('/cameras/:id/video', officerController.updateCameraVideo);
 
 router.get('/citizens', officerController.listCitizens);
 router.post('/citizens', officerController.createCitizen);
@@ -28,5 +30,6 @@ router.post('/violations/:id/verify', violationController.verifyViolation);
 router.post('/violations/:id/reject', violationController.rejectViolation);
 router.patch('/violations/:id/plate', violationController.updatePlate);
 router.post('/violations/:id/invoice', violationController.createInvoice);
+router.post('/invoices/:id/cancel', violationController.cancelInvoice);
 
 module.exports = router;

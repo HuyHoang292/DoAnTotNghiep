@@ -1,6 +1,6 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { useEffect, useMemo, useState } from 'react'
-import { ArrowRightLeft, Car, Loader2, Pencil, Plus, Search, X } from 'lucide-react'
+import { ArrowRightLeft, Car, Clock, ImageOff, Loader2, Pencil, Plus, Search, X } from 'lucide-react'
 import {
   createVehicleRequest,
   getOfficerDashboard,
@@ -10,8 +10,15 @@ import {
   updateVehicleRequest,
 } from '@/lib/api'
 import { formatDate, formatDateTime } from '@/lib/format'
-import type { Vehicle, VehicleOwner, Violation } from '@/lib/types'
+import {
+  VEHICLE_VERIFICATION_STATUS_LABEL,
+  type Vehicle,
+  type VehicleOwner,
+  type VehicleVerificationStatus,
+  type Violation,
+} from '@/lib/types'
 import { EmptyState, Modal, PageHeader, PlateTag, StatCard } from '@/components/ui'
+import { PlateImageUpload } from '@/components/PlateImageUpload'
 
 export const Route = createFileRoute('/officer/vehicles')({
   component: OfficerVehicles,
@@ -26,6 +33,24 @@ const VEHICLE_TYPE_LABEL: Record<string, string> = {
 }
 
 const VEHICLE_TYPES = ['CAR', 'MOTORBIKE', 'TRUCK', 'BUS', 'OTHER'] as const
+
+const VERIFICATION_STATUSES: VehicleVerificationStatus[] = ['PENDING', 'APPROVED', 'REVISION_REQUESTED', 'REJECTED']
+
+const VERIFICATION_TONE: Record<VehicleVerificationStatus, string> = {
+  PENDING: 'border-amber-200 bg-amber-50 text-amber-800',
+  APPROVED: 'border-emerald-200 bg-emerald-50 text-emerald-800',
+  REVISION_REQUESTED: 'border-blue-200 bg-blue-50 text-blue-800',
+  REJECTED: 'border-red-200 bg-red-50 text-red-800',
+}
+
+function VerificationBadge({ status }: { status?: VehicleVerificationStatus }) {
+  const s = status || 'PENDING'
+  return (
+    <span className={`inline-flex whitespace-nowrap rounded-full border px-2.5 py-0.5 text-xs font-medium ${VERIFICATION_TONE[s]}`}>
+      {VEHICLE_VERIFICATION_STATUS_LABEL[s]}
+    </span>
+  )
+}
 
 const inputClass =
   'h-10 w-full rounded-xl border border-slate-200 px-3 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100'
@@ -45,6 +70,7 @@ function OfficerVehicles() {
   const [q, setQ] = useState('')
   const [searchField, setSearchField] = useState<'all' | 'ownerName' | 'licensePlate' | 'ownerNationalId'>('all')
   const [typeFilter, setTypeFilter] = useState('all')
+  const [statusFilter, setStatusFilter] = useState('all')
   const [page, setPage] = useState(1)
   const [viewing, setViewing] = useState<Vehicle | null>(null)
   const [editing, setEditing] = useState<Vehicle | null>(null)
@@ -109,15 +135,18 @@ function OfficerVehicles() {
         }
       })
       .filter((v) => typeFilter === 'all' || v.vehicleType === typeFilter)
-  }, [vehicles, q, searchField, typeFilter])
+      .filter((v) => statusFilter === 'all' || (v.verificationStatus || 'PENDING') === statusFilter)
+  }, [vehicles, q, searchField, typeFilter, statusFilter])
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE))
   const safePage = Math.min(page, totalPages)
   const rows = filtered.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE)
 
-  const carCount = vehicles.filter((v) => v.vehicleType === 'CAR').length
-  const bikeCount = vehicles.filter((v) => v.vehicleType === 'MOTORBIKE').length
   const withVio = new Set(violations.map((v) => v.vehicleId).filter(Boolean)).size
+  const pendingCount = vehicles.filter((v) => (v.verificationStatus || 'PENDING') === 'PENDING').length
+  const needsFixCount = vehicles.filter(
+    (v) => v.verificationStatus === 'REVISION_REQUESTED' || v.verificationStatus === 'REJECTED',
+  ).length
 
   const replaceVehicle = (next: Vehicle) => {
     setVehicles((prev) => prev.map((v) => (v.id === next.id ? next : v)))
@@ -156,11 +185,11 @@ function OfficerVehicles() {
       <div className="grid gap-3 sm:grid-cols-3">
         <StatCard label="Tổng phương tiện" value={vehicles.length} icon={<Car className="h-5 w-5" />} tone="info" />
         <StatCard
-          label="Ô tô"
-          value={carCount}
-          icon={<Car className="h-5 w-5" />}
-          tone="default"
-          hint={`${bikeCount} xe máy`}
+          label="Chờ công dân duyệt"
+          value={pendingCount}
+          icon={<Clock className="h-5 w-5" />}
+          tone="pending"
+          hint={needsFixCount ? `${needsFixCount} xe cần chỉnh sửa` : undefined}
         />
         <StatCard label="Xe có vi phạm" value={withVio} icon={<Car className="h-5 w-5" />} tone="danger" />
       </div>
@@ -228,7 +257,33 @@ function OfficerVehicles() {
             </option>
           ))}
         </select>
+
+        <select
+          value={statusFilter}
+          onChange={(e) => {
+            setStatusFilter(e.target.value)
+            setPage(1)
+          }}
+          className="h-10 rounded-xl border border-slate-200 bg-white px-3 text-sm outline-none focus:border-blue-400"
+        >
+          <option value="all">Tất cả trạng thái</option>
+          {VERIFICATION_STATUSES.map((s) => (
+            <option key={s} value={s}>
+              {VEHICLE_VERIFICATION_STATUS_LABEL[s]}
+            </option>
+          ))}
+        </select>
       </div>
+
+      <p className="px-1 text-sm text-slate-600">
+        {typeFilter === 'all' ? 'Tổng số phương tiện' : `Tổng số ${VEHICLE_TYPE_LABEL[typeFilter]?.toLowerCase() ?? typeFilter}`}
+        {statusFilter !== 'all' && ` (${VEHICLE_VERIFICATION_STATUS_LABEL[statusFilter as VehicleVerificationStatus].toLowerCase()})`}
+        {q.trim() && ' khớp tìm kiếm'}:{' '}
+        <span className="font-semibold text-slate-900">{filtered.length} xe</span>
+        {filtered.length !== vehicles.length && (
+          <span className="text-slate-400"> / {vehicles.length} xe </span>
+        )}
+      </p>
 
       <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
         {rows.length === 0 ? (
@@ -240,6 +295,7 @@ function OfficerVehicles() {
                 <thead className="border-b border-slate-100 bg-slate-50 text-xs font-semibold uppercase tracking-wide text-slate-500">
                   <tr>
                     <th className="px-4 py-3 text-left">Biển số</th>
+                    <th className="px-4 py-3 text-left">Trạng thái</th>
                     <th className="px-4 py-3 text-left">Loại xe</th>
                     <th className="px-4 py-3 text-left">Hãng / Mẫu</th>
                     <th className="px-4 py-3 text-left">Màu</th>
@@ -256,7 +312,26 @@ function OfficerVehicles() {
                       onClick={() => setViewing(v)}
                     >
                       <td className="px-4 py-3">
-                        <PlateTag value={v.licensePlate} />
+                        <div className="flex items-center gap-2">
+                          {v.plateImageUrl ? (
+                            <img
+                              src={v.plateImageUrl}
+                              alt=""
+                              className="h-9 w-14 shrink-0 rounded-md border border-slate-200 object-cover"
+                            />
+                          ) : (
+                            <span
+                              title="Chưa có ảnh biển số"
+                              className="grid h-9 w-14 shrink-0 place-items-center rounded-md border border-dashed border-slate-200 text-slate-300"
+                            >
+                              <ImageOff className="h-4 w-4" />
+                            </span>
+                          )}
+                          <PlateTag value={v.licensePlate} />
+                        </div>
+                      </td>
+                      <td className="px-4 py-3">
+                        <VerificationBadge status={v.verificationStatus} />
                       </td>
                       <td className="px-4 py-3 text-slate-600">
                         {VEHICLE_TYPE_LABEL[v.vehicleType] ?? v.vehicleType}
@@ -421,8 +496,26 @@ function VehicleDetailModal({
 
   return (
     <Modal title="Thông tin phương tiện" onClose={onClose} wide>
-      <div className="mb-4">
+      {vehicle.plateImageUrl ? (
+        <a href={vehicle.plateImageUrl} target="_blank" rel="noreferrer" className="mb-4 block">
+          <img
+            src={vehicle.plateImageUrl}
+            alt={`Ảnh biển số ${vehicle.licensePlate}`}
+            className="max-h-64 w-full rounded-xl border border-slate-200 bg-slate-100 object-contain"
+          />
+        </a>
+      ) : (
+        <div className="mb-4 flex h-24 items-center justify-center gap-2 rounded-xl border border-dashed border-slate-200 text-sm text-slate-400">
+          <ImageOff className="h-4 w-4" /> Chưa có ảnh biển số
+        </div>
+      )}
+
+      <div className="mb-4 flex flex-wrap items-center gap-2">
         <PlateTag value={vehicle.licensePlate} />
+        <VerificationBadge status={vehicle.verificationStatus} />
+        {vehicle.verifiedAt && (
+          <span className="text-xs text-slate-500">Công dân phản hồi lúc {formatDateTime(vehicle.verifiedAt)}</span>
+        )}
       </div>
 
       {/* Trạng thái xác minh */}
@@ -530,6 +623,7 @@ function VehicleFormModal({
     color?: string
     insuranceNumber?: string
     registeredAt: string
+    plateImageUrl?: string
   }) => Promise<void>
 }) {
   const isEdit = Boolean(vehicle)
@@ -541,6 +635,7 @@ function VehicleFormModal({
   const [insuranceNumber, setInsuranceNumber] = useState('')
   const [registeredAt, setRegisteredAt] = useState(isEdit ? '' : todayInput())
   const [ownerId, setOwnerId] = useState(isEdit ? '' : citizens[0]?.id ?? '')
+  const [plateImageUrl, setPlateImageUrl] = useState('')
   const [saving, setSaving] = useState(false)
   const [formError, setFormError] = useState('')
 
@@ -566,6 +661,7 @@ function VehicleFormModal({
               color: color.trim(),
               insuranceNumber: insuranceNumber.trim(),
               registeredAt,
+              plateImageUrl: plateImageUrl || undefined,
             })
           } catch (err) {
             setFormError(err instanceof Error ? err.message : 'Không lưu được phương tiện.')
@@ -574,6 +670,17 @@ function VehicleFormModal({
           }
         }}
       >
+        <div className="sm:col-span-2">
+          <PlateImageUpload
+            purpose="vehicles"
+            label={isEdit ? 'Ảnh biển số (tải ảnh mới nếu muốn thay)' : 'Ảnh biển số'}
+            imageUrl={plateImageUrl || vehicle?.plateImageUrl}
+            onUploaded={(res) => {
+              setPlateImageUrl(res.imageUrl)
+              if (res.plateText) setLicensePlate(res.plateText)
+            }}
+          />
+        </div>
         <Field label={isEdit ? 'Biển số (để trống nếu không đổi)' : 'Biển số'}>
           <input
             className={`${inputClass} font-mono uppercase`}

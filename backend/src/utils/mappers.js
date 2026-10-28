@@ -37,6 +37,7 @@ function mapVehicle(row) {
     chassisNumber: row.chassis_number,
     engineNumber: row.engine_number,
     insuranceNumber: row.insurance_number,
+    plateImageUrl: row.plate_image_url ?? null,
     verificationStatus: row.verification_status,
     citizenFeedback: row.citizen_feedback,
     verifiedAt: toIso(row.verified_at),
@@ -74,8 +75,13 @@ function mapOwner(row) {
 function mapCamera(row) {
   return {
     id: row.id,
+    cameraCode: row.camera_code ?? null,
     locationName: row.location_name,
     roadSegment: row.road_segment,
+    latitude: toNumber(row.latitude),
+    longitude: toNumber(row.longitude),
+    hlsStreamUrl: row.hls_stream_url ?? null,
+    videoUrl: row.video_url ?? null,
     status: row.status,
   };
 }
@@ -142,6 +148,9 @@ function mapInvoice(row) {
     issueDate: toDateOnly(row.issue_date),
     dueDate: toDateOnly(row.due_date),
     status: resolveInvoiceStatus(row),
+    paymentMethod: row.payment_method ?? null,
+    paidAt: toIso(row.paid_at),
+    createdAt: toIso(row.created_at),
   };
 }
 
