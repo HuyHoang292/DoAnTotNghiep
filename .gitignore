@@ -65,6 +65,3 @@ Thumbs.db
 *.swp
 coverage/
 .nyc_output/
-
-# Claude Code
-.claude/
