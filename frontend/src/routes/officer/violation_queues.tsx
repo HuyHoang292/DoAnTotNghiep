@@ -8,9 +8,9 @@ import {
   lookupPlateRequest,
   type ViolationDetail,
 } from '@/lib/api'
-import { PageHeader, Modal } from '@/components/ui'
+import { PageHeader, Modal, PlateCloseup } from '@/components/ui'
 import { formatDateTime, formatCurrency } from '@/lib/format'
-import { VIOLATION_TYPE_LABEL } from '@/lib/types'
+import { UNREAD_PLATE, VIOLATION_TYPE_LABEL } from '@/lib/types'
 import { CheckCircle, Loader2, XCircle, AlertTriangle } from 'lucide-react'
 
 export const Route = createFileRoute('/officer/violation_queues')({
@@ -56,7 +56,8 @@ function QueuePage() {
 
   const openVerifyModal = (violation: ViolationDetail) => {
     setActiveViolation(violation)
-    setPlate(violation.detectedPlateText)
+    // AI chưa đọc được biển thì để trống cho cán bộ nhập từ ảnh
+    setPlate(violation.detectedPlateText === UNREAD_PLATE ? '' : violation.detectedPlateText)
     setVehicleInfo(null)
     // Auto lookup nếu đã có license_plate trong data
     if (violation.licensePlate) {
@@ -196,9 +197,12 @@ function QueuePage() {
               </div>
               
               <div className="space-y-3 p-4">
+                {v.plateImageUrl && (
+                  <img src={v.plateImageUrl} alt="Ảnh cận biển số" loading="lazy" className="h-24 w-full rounded-lg bg-slate-900 object-contain" />
+                )}
                 <div className="flex items-center gap-2">
                   <span className="flex-1 truncate rounded-lg bg-amber-100 px-2.5 py-1.5 font-mono text-sm font-bold text-amber-900">
-                    {v.detectedPlateText}
+                    {v.detectedPlateText === UNREAD_PLATE ? 'Chưa đọc được biển' : v.detectedPlateText}
                   </span>
                   <Link
                     to="/officer/violations/$id"
@@ -255,6 +259,7 @@ function QueuePage() {
           onClose={() => setActiveViolation(null)}
         >
           <div className="space-y-4">
+            <PlateCloseup src={activeViolation.plateImageUrl} />
             <img
               src={activeViolation.evidenceImageUrl}
               alt="Ảnh chứng cứ"

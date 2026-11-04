@@ -299,5 +299,6 @@ module.exports = {
   normalizePlate,
   formatVietnamPlate,
   looksLikePlate,
+  pickPlateText,
   recognizePlateFromImage,
 };

@@ -1,46 +1,85 @@
-# Hệ Thống Quản Lý Vi Phạm Giao Thông
+# Hệ Thống Quản Lý Và Xử Lý Vi Phạm Giao Thông
 
-Nền tảng toàn diện để phát hiện, xử lý và quản lý vi phạm giao thông thông qua camera giám sát tự động kết hợp AI nhận diện biển số xe.
+Ứng dụng web hỗ trợ lực lượng cảnh sát giao thông **phát hiện, xác minh và xử phạt vi phạm** dựa trên camera giám sát kết hợp **AI nhận diện biển số xe (YOLO)**, đồng thời cho phép **công dân tra cứu vi phạm, hóa đơn và xác nhận thông tin phương tiện** của mình.
+
+> Đồ án tốt nghiệp — Nguyễn Sỹ Huy Hoàng
 
 ---
 
 ## Mục Lục
 
-- [Tổng Quan Kiến Trúc](#tổng-quan-kiến-trúc)
+- [Chức Năng](#chức-năng)
+- [Kiến Trúc Hệ Thống](#kiến-trúc-hệ-thống)
 - [Công Nghệ Sử Dụng](#công-nghệ-sử-dụng)
 - [Cấu Trúc Dự Án](#cấu-trúc-dự-án)
-- [Database Schema](#database-schema)
+- [Cơ Sở Dữ Liệu](#cơ-sở-dữ-liệu)
 - [API Endpoints](#api-endpoints)
 - [Hướng Dẫn Cài Đặt](#hướng-dẫn-cài-đặt)
 - [Biến Môi Trường](#biến-môi-trường)
-- [Chạy Migration & Seed](#chạy-migration--seed)
-- [Phân Quyền Hệ Thống](#phân-quyền-hệ-thống)
+- [Tài Khoản Mẫu](#tài-khoản-mẫu)
+- [Phân Quyền](#phân-quyền)
+- [Tài Liệu Thiết Kế](#tài-liệu-thiết-kế)
+- [Ghi Chú Phát Triển](#ghi-chú-phát-triển)
 
 ---
 
-## Tổng Quan Kiến Trúc
+## Chức Năng
 
-Hệ thống gồm 3 service độc lập được orchestrate bằng Docker Compose:
+### Chung (mọi người dùng)
+- Đăng nhập bằng **email, số CCCD hoặc số điện thoại**; đăng xuất
+- Bắt buộc **đổi mật khẩu ở lần đăng nhập đầu tiên** (tài khoản công dân do cán bộ cấp)
+- Đổi mật khẩu; ghi nhận **lịch sử đăng nhập** (thành công / thất bại, IP, trình duyệt)
+
+### Cán bộ công an (`OFFICER`, `ADMIN`)
+| Màn hình | Chức năng |
+|----------|-----------|
+| Tổng quan | Thống kê vi phạm theo ngày, theo loại, theo điểm camera; vi phạm mới nhất |
+| Quét biển số | Tải ảnh lên để AI nhận diện biển số, hoặc tra cứu thủ công → xem phương tiện, chủ xe, vi phạm và biên lai liên quan |
+| Công dân | Xem / tìm kiếm, thêm mới (tự gửi tài khoản qua email), cập nhật thông tin, xem lịch sử đăng nhập |
+| Phương tiện | Xem / tìm kiếm, đăng ký mới, cập nhật, **cập nhật biển số qua ảnh tải lên**, chuyển nhượng quyền sở hữu |
+| Vi phạm | Danh sách có bộ lọc, xem chi tiết, thêm vi phạm thủ công kèm ảnh bằng chứng, xác minh, từ chối, chỉnh sửa biển số |
+| Hàng đợi AI | Duyệt các vi phạm do AI phát hiện (`AI_PENDING`): xác minh, xác minh và phát hành hóa đơn, hoặc từ chối |
+| Hóa đơn | Danh sách biên lai, phát hành hóa đơn từ vi phạm đã xác minh, hủy biên lai (kèm lý do) |
+| Camera | Danh sách camera, trạng thái hoạt động, xem khung hình / video mẫu, cập nhật hoặc gỡ video |
+| Báo cáo | Thống kê theo kỳ (diễn biến vi phạm và thu phạt, cơ cấu loại vi phạm, địa điểm nhiều vi phạm), xuất CSV |
+
+### Công dân (`CITIZEN`)
+| Màn hình | Chức năng |
+|----------|-----------|
+| Trang chủ | Tổng quan phương tiện, vi phạm và hóa đơn của bản thân |
+| Hồ sơ cá nhân | Xem thông tin cá nhân, đổi mật khẩu |
+| Phương tiện | Xem phương tiện đứng tên; **xác nhận**, **yêu cầu chỉnh sửa** hoặc **từ chối** thông tin do cán bộ đăng ký |
+| Vi phạm | Tra cứu vi phạm, lọc theo xe / loại / trạng thái / thời gian, xem chi tiết và hóa đơn liên quan |
+| Hóa đơn | Danh sách hóa đơn theo trạng thái (chưa nộp, quá hạn, đã nộp), xem chi tiết |
+
+> **Đang phát triển:** *Quên mật khẩu* và *Khiếu nại vi phạm* đã có giao diện nhưng backend chưa có API tương ứng.
+
+---
+
+## Kiến Trúc Hệ Thống
 
 ```
-┌─────────────────┐     ┌─────────────────┐     ┌─────────────────┐
-│    Frontend     │────▶│    Backend      │────▶│   AI Service    │
-│  React + Vite   │     │  Node.js/Express│     │  FastAPI + YOLO │
-│   Port: 5173    │     │   Port: 5000    │     │   Port: 8000    │
-└─────────────────┘     └────────┬────────┘     └─────────────────┘
-                                 │
-                        ┌────────▼────────┐
-                        │   MySQL 8.0     │
-                        │  Port: 3309     │
-                        └─────────────────┘
+┌──────────────────┐   /api (proxy)   ┌──────────────────┐   HTTP    ┌──────────────────┐
+│     Frontend     │ ───────────────▶ │     Backend      │ ────────▶ │    AI Service    │
+│ React + Vite     │                  │ Node.js/Express  │           │ FastAPI + YOLO   │
+│ Port 5173        │                  │ Port 5000        │           │ Port 8000        │
+└──────────────────┘                  └───┬──────────┬───┘           └──────────────────┘
+                                          │          │
+                               ┌──────────▼───┐  ┌───▼─────────────────────┐
+                               │  MySQL 8.0   │  │ Dịch vụ ngoài           │
+                               │  Port 3309   │  │ • Cloudinary (lưu ảnh)  │
+                               └──────────────┘  │ • Gmail SMTP (gửi mail) │
+                                                 └─────────────────────────┘
 ```
 
-**Luồng xử lý vi phạm:**
-1. Camera gửi frame ảnh → AI Service nhận diện biển số bằng YOLO
-2. Kết quả OCR (biển số + confidence) → Backend lưu vào `camera_events`
-3. Sĩ quan xem xét và xác minh → chuyển thành `violations`
-4. Hệ thống tạo `invoices` và gửi `notifications` cho công dân
-5. Công dân tra cứu vi phạm và hóa đơn qua giao diện web
+**Luồng xử lý vi phạm**
+
+1. Camera / cán bộ cung cấp ảnh → Backend gửi sang AI Service
+2. AI Service dùng YOLO phát hiện vùng biển số, sau đó đọc từng ký tự → trả về biển số và độ tin cậy
+3. Vi phạm do AI ghi nhận ở trạng thái `AI_PENDING` và nằm trong **hàng đợi AI**; cán bộ cũng có thể lập vi phạm thủ công (`source = OFFICER`)
+4. Cán bộ kiểm tra, sửa biển số nếu cần → **xác minh** (`OFFICER_VERIFIED`) hoặc **từ chối** (`REJECTED`)
+5. Phát hành hóa đơn → vi phạm chuyển sang `INVOICED`, hóa đơn ở trạng thái `UNPAID`
+6. Công dân đăng nhập để tra cứu vi phạm và hóa đơn của mình
 
 ---
 
@@ -49,46 +88,35 @@ Hệ thống gồm 3 service độc lập được orchestrate bằng Docker Com
 ### Frontend
 | Công nghệ | Phiên bản | Mục đích |
 |-----------|-----------|----------|
-| React | 18.3.x | UI framework |
-| TypeScript | 5.2.x | Type safety |
-| Vite | 5.2.x | Build tool & dev server |
-| TanStack Router | 1.31.x | File-based routing |
-| Tailwind CSS | 3.4.x | Utility-first styling |
-| Zustand | 4.5.x | State management |
-| Lucide React | 0.378.x | Icon library |
-| Sonner | 1.4.x | Toast notifications |
+| React + TypeScript | 18.3 / 5.2 | Xây dựng giao diện |
+| Vite | 5.2 | Build tool, dev server, proxy `/api` |
+| TanStack Router | 1.31 | Định tuyến theo file (`src/routes`) |
+| Tailwind CSS | 3.4 | Giao diện |
+| Recharts | 2.15 | Biểu đồ tổng quan, báo cáo |
+| Zustand | 4.5 | Quản lý state |
+| Lucide React, Sonner | — | Icon, thông báo toast |
 
 ### Backend
 | Công nghệ | Phiên bản | Mục đích |
 |-----------|-----------|----------|
-| Node.js | LTS | Runtime |
-| Express | 5.2.x | Web framework |
-| Knex.js | 3.3.x | SQL query builder & migration manager |
-| mysql2 | 3.24.x | MySQL driver |
-| bcryptjs | 3.0.x | Password hashing |
-| jsonwebtoken | 9.0.x | JWT authentication |
-| axios | 1.20.x | HTTP client (gọi AI Service) |
-| sharp | 0.33.x | Image processing |
-| tesseract.js | 5.1.x | OCR fallback |
-| dotenv | 17.4.x | Environment config |
-| nodemon | 3.1.x | Dev auto-reload |
-
-### Database
-| Công nghệ | Chi tiết |
-|-----------|---------|
-| MySQL | 8.0 — chạy trong Docker container |
-| Migration | Knex.js — 9 migration files theo thứ tự số |
-| Seed | Knex.js — dữ liệu mẫu cho development |
+| Node.js | 18 (Docker) / 20 LTS | Runtime |
+| Express | 5.2 | REST API |
+| Knex.js + mysql2 | 3.3 / 3.24 | Query builder, migration, seed |
+| jsonwebtoken, bcryptjs | 9.0 / 3.0 | Xác thực JWT, băm mật khẩu |
+| axios, form-data | 1.20 / 4.0 | Gọi AI Service |
+| cloudinary | 2.11 | Lưu ảnh biển số, ảnh bằng chứng |
+| nodemailer | 6.10 | Gửi email tài khoản cho công dân |
+| sharp | 0.33 | Xử lý ảnh |
 
 ### AI Service
 | Công nghệ | Mục đích |
-|-----------|---------|
-| Python 3.x | Runtime |
-| FastAPI | Async web framework |
-| Ultralytics YOLO | Nhận diện vị trí biển số (`detect_plate.pt`) |
-| YOLO (char model) | Đọc ký tự biển số (`read_characters.pt`) |
-| OpenCV | Xử lý và crop ảnh |
-| NumPy | Tính toán mảng số |
+|-----------|----------|
+| Python 3.10+, FastAPI, Uvicorn | Web service |
+| Ultralytics YOLO | `detect_plate.pt` — phát hiện vùng biển số; `read_characters.pt` — nhận dạng ký tự |
+| OpenCV, NumPy | Đọc và cắt ảnh |
+
+### Cơ sở dữ liệu & triển khai
+MySQL 8.0, Docker Compose.
 
 ---
 
@@ -96,293 +124,111 @@ Hệ thống gồm 3 service độc lập được orchestrate bằng Docker Com
 
 ```
 DoAnTotNghiep/
-├── docker-compose.yml              # Orchestrate MySQL + Backend
+├── docker-compose.yml               # MySQL + Backend (AI Service tùy chọn)
+├── docs/                            # Tài liệu thiết kế (ERD, use case)
 │
-├── frontend/                       # React + TypeScript SPA
-│   ├── src/
-│   │   ├── components/
-│   │   │   ├── AppShell.tsx        # Layout chính (sidebar, header)
-│   │   │   └── ui.tsx              # Shared UI components
-│   │   ├── lib/
-│   │   │   ├── api.ts              # Axios instance & API calls
-│   │   │   ├── auth.tsx            # Auth context & hooks
-│   │   │   ├── types.ts            # TypeScript interfaces
-│   │   │   ├── format.ts           # Date/currency formatters
-│   │   │   ├── cn.ts               # Tailwind class merger
-│   │   │   └── demo-data.ts        # Mock data cho development
-│   │   └── routes/
-│   │       ├── index.tsx           # Trang đăng nhập
-│   │       ├── citizen/            # Giao diện công dân
-│   │       │   ├── dashboard.tsx   # Tổng quan vi phạm
-│   │       │   ├── profile.tsx     # Thông tin cá nhân
-│   │       │   ├── vehicles/       # Quản lý phương tiện
-│   │       │   └── invoices/       # Tra cứu & xem hóa đơn
-│   │       └── officer/            # Giao diện sĩ quan CSGT
-│   │           ├── dashboard.tsx   # Thống kê tổng quan
-│   │           ├── scan.tsx        # Quét biển số qua AI
-│   │           ├── citizens.tsx    # Quản lý tài khoản công dân
-│   │           └── vehicles.tsx    # Quản lý phương tiện
-│   ├── index.html
-│   ├── vite.config.ts
-│   ├── tailwind.config.js
-│   └── tsconfig.json
+├── frontend/                        # React + TypeScript SPA
+│   └── src/
+│       ├── components/              # AppShell (layout), ui, ChangePasswordModal, PlateImageUpload
+│       ├── lib/                     # api.ts, auth.tsx, types.ts, format.ts, cn.ts
+│       └── routes/
+│           ├── index.tsx            # Đăng nhập
+│           ├── forgot_password.tsx  # Quên mật khẩu
+│           ├── citizen/             # dashboard, profile, vehicles/, violations/, invoices/
+│           └── officer/             # dashboard, scan, citizens, vehicles, violations/,
+│                                    # violation_queues, invoices, cameras, reports
 │
-├── backend/                        # Node.js + Express REST API
-│   ├── src/
-│   │   ├── server.js               # Entry point, khởi động Express app
-│   │   ├── controllers/
-│   │   │   ├── authController.js   # Đăng nhập, lấy thông tin user
-│   │   │   ├── citizenController.js
-│   │   │   └── officerController.js
-│   │   ├── routes/
-│   │   │   ├── authRoutes.js       # /api/auth/*
-│   │   │   ├── citizenRoutes.js    # /api/citizen/*
-│   │   │   └── officerRoutes.js    # /api/officer/*
-│   │   ├── middlewares/
-│   │   │   ├── authMiddleware.js   # Xác thực JWT Bearer token
-│   │   │   └── roleMiddleware.js   # Phân quyền theo role
-│   │   ├── db/
-│   │   │   ├── knex.js             # Khởi tạo Knex instance
-│   │   │   ├── migrations/         # 9 migration files
-│   │   │   └── seeds/              # Seed data mẫu
-│   │   └── utils/
-│   ├── knexfile.js                 # Cấu hình Knex cho dev/prod
-│   ├── .env                        # Biến môi trường (không commit)
-│   ├── Dockerfile
-│   └── package.json
+├── backend/                         # Node.js + Express REST API
+│   ├── knexfile.js
+│   ├── .env.example
+│   └── src/
+│       ├── server.js                # Entry point
+│       ├── routes/                  # authRoutes, citizenRoutes, officerRoutes
+│       ├── controllers/             # auth, citizen, officer, violation
+│       ├── middlewares/             # authMiddleware (JWT), roleMiddleware (phân quyền)
+│       ├── services/                # plateRecognition (gọi AI), imageStorage (Cloudinary)
+│       ├── utils/                   # mappers, trustSystemCa
+│       └── db/
+│           ├── migrations/          # Tạo bảng + các migration bổ sung
+│           └── seeds/               # Dữ liệu mẫu
 │
-└── ai-service/                     # Python FastAPI AI Service
-    ├── main.py                     # Entry point, định nghĩa API endpoints
-    ├── plate_utils.py              # Hàm ghép ký tự thành chuỗi biển số
-    ├── models/                     # YOLO model weights (.pt files)
-    │   ├── detect_plate.pt         # Model phát hiện vùng biển số
-    │   └── read_characters.pt      # Model nhận dạng từng ký tự
-    └── requirements.txt
+└── ai-service/                      # Python FastAPI
+    ├── main.py                      # /health, /api/ai/detect-plate
+    ├── plate_utils.py               # Ghép ký tự thành chuỗi biển số
+    └── models/                      # detect_plate.pt, read_characters.pt (không commit)
 ```
 
 ---
 
-## Database Schema
+## Cơ Sở Dữ Liệu
 
-Hệ thống sử dụng **MySQL 8.0** với 9 bảng được quản lý hoàn toàn qua **Knex.js migrations**.
+MySQL 8.0, toàn bộ schema quản lý bằng **Knex migrations**. Sơ đồ quan hệ: [`docs/LuocDoQuanHe.png`](docs/LuocDoQuanHe.png).
 
-### Sơ đồ quan hệ
-
-```
-users ──────────────────────────────────────────────────┐
-  │ (owner_id)                                          │ (created_by)
-  ▼                                                     │
-vehicles                                               │
-  │ (vehicle_id)                                        │
-  ▼                                                     │
-violations ◀──── cameras (camera_id)                   │
-  │    │                                                │
-  │    └──── camera_events (promoted_violation_id)      │
-  │                                                     │
-  ▼                                                     │
-invoices                                               │
-  │                                                     │
-  ▼                                                     │
-notifications ──────────────────────────────────────────┘
-
-audit_logs  (log độc lập mọi thao tác quan trọng)
-fines       (bảng tra cứu mức phạt theo loại vi phạm)
-```
-
-### Chi tiết các bảng
-
-#### `users` — Tài khoản người dùng
-| Cột | Kiểu | Ghi chú |
-|-----|------|---------|
-| id | VARCHAR(36) PK | UUID |
-| full_name | VARCHAR(100) NOT NULL | Họ và tên |
-| national_id | VARCHAR(20) UNIQUE | Số CCCD/CMND |
-| email | VARCHAR(100) UNIQUE | Email |
-| phone | VARCHAR(20) UNIQUE | Số điện thoại |
-| password_hash | VARCHAR(255) | Mật khẩu hash bằng bcrypt |
-| role | ENUM | `CITIZEN` / `OFFICER` / `ADMIN` |
-| status | ENUM | `ACTIVE` / `INACTIVE` / `SUSPENDED` |
-| badge_number | VARCHAR(50) | Số hiệu (chỉ dùng cho OFFICER) |
-| created_by | FK → users.id | Ai tạo tài khoản này |
-
-> Đăng nhập được thực hiện bằng **email**, **số CCCD**, hoặc **số điện thoại**.
-
-#### `vehicles` — Phương tiện
-| Cột | Kiểu | Ghi chú |
-|-----|------|---------|
-| id | VARCHAR(36) PK | UUID |
-| license_plate | VARCHAR(20) UNIQUE | Biển số xe |
-| owner_id | FK → users.id | Chủ phương tiện |
-| vehicle_type | ENUM | `CAR` / `MOTORBIKE` / `TRUCK` / `BUS` / `OTHER` |
-| plate_color | ENUM | `WHITE` / `BLUE` / `YELLOW` / `RED` |
-| brand | VARCHAR(50) | Hãng xe |
-| model | VARCHAR(50) | Dòng xe |
-| chassis_number | VARCHAR(50) UNIQUE | Số khung xe |
-| engine_number | VARCHAR(50) UNIQUE | Số máy |
-| registered_at | DATE | Ngày đăng ký xe |
-
-#### `fines` — Bảng mức phạt theo loại vi phạm
-| Cột | Kiểu | Ghi chú |
-|-----|------|---------|
-| id | INT PK AUTO | |
-| violation_type | ENUM UNIQUE | `RED_LIGHT` / `WRONG_LANE` / `SPEEDING` / `ILLEGAL_PARKING` / `HELMET_LESS` / `WRONG_WAY` |
-| title | VARCHAR(255) | Tên loại vi phạm |
-| min_amount | DECIMAL(12,2) | Mức phạt tối thiểu (VND) |
-| max_amount | DECIMAL(12,2) | Mức phạt tối đa (VND) |
-| default_amount | DECIMAL(12,2) | Mức phạt mặc định (VND) |
-
-#### `cameras` — Camera giám sát
-| Cột | Kiểu | Ghi chú |
-|-----|------|---------|
-| id | VARCHAR(36) PK | UUID |
-| camera_code | VARCHAR(50) UNIQUE | Mã định danh camera |
-| location_name | VARCHAR(255) | Tên địa điểm lắp đặt |
-| latitude / longitude | DOUBLE | Tọa độ GPS |
-| road_segment | VARCHAR(100) | Đoạn đường giám sát |
-| rtsp_stream_url | TEXT | URL luồng video RTSP |
-| hls_stream_url | TEXT | URL luồng video HLS |
-| status | ENUM | `ONLINE` / `OFFLINE` / `MAINTENANCE` |
-
-#### `violations` — Vi phạm đã xác minh
-| Cột | Kiểu | Ghi chú |
-|-----|------|---------|
-| id | VARCHAR(36) PK | UUID |
-| camera_id | FK → cameras.id | Camera ghi nhận vi phạm |
-| vehicle_id | FK → vehicles.id | Phương tiện (NULL nếu chưa tra được) |
-| detected_plate_text | VARCHAR(20) | Biển số do AI đọc |
-| corrected_plate_text | VARCHAR(20) | Biển số sĩ quan đã hiệu chỉnh |
-| ocr_confidence | FLOAT | Độ tin cậy OCR (0.0 – 1.0) |
-| violation_type | ENUM | Loại vi phạm |
-| evidence_image_url | TEXT | URL ảnh bằng chứng |
-| evidence_video_url | TEXT | URL video bằng chứng |
-| status | ENUM | `AI_PENDING` → `OFFICER_VERIFIED` / `REJECTED` → `INVOICED` |
-| verified_by | FK → users.id | Sĩ quan xác minh |
-| verified_at | DATETIME | Thời điểm xác minh |
-
-#### `camera_events` — Sự kiện thô từ camera
-Ghi nhận mọi lần AI phát hiện phương tiện, kể cả chưa phải vi phạm.
-
-| Cột | Kiểu | Ghi chú |
-|-----|------|---------|
-| id | VARCHAR(36) PK | UUID |
-| camera_id | FK → cameras.id | |
-| video_timestamp | DOUBLE | Thời điểm trong video (giây) |
-| detected_plate_text | VARCHAR(20) | Biển số OCR |
-| ocr_confidence | FLOAT | Độ tin cậy |
-| bounding_box | JSON | Tọa độ vùng biển số `{x1, y1, x2, y2}` |
-| is_violation | BOOLEAN | Có phải vi phạm không |
-| violation_type | ENUM | Loại vi phạm nếu có |
-| snapshot_url | TEXT | URL ảnh snapshot |
-| promoted_violation_id | FK → violations.id | Liên kết nếu đã tạo violation |
-
-#### `invoices` — Hóa đơn phạt
-| Cột | Kiểu | Ghi chú |
-|-----|------|---------|
-| id | VARCHAR(36) PK | UUID |
-| violation_id | FK → violations.id UNIQUE | Mỗi vi phạm chỉ có 1 hóa đơn |
-| invoice_code | VARCHAR(50) UNIQUE | Mã hóa đơn in ra |
-| amount | DECIMAL(12,2) | Số tiền phạt (VND) |
-| issue_date | DATE | Ngày phát hành |
-| due_date | DATE | Hạn thanh toán |
-| status | ENUM | `UNPAID` / `PAID` / `OVERDUE` / `CANCELLED` |
-| payment_method | VARCHAR(50) | Phương thức thanh toán |
-| transaction_id | VARCHAR(100) | Mã giao dịch |
-| paid_at | DATETIME | Thời điểm thanh toán |
-
-#### `notifications` — Thông báo gửi cho người dùng
-| Cột | Kiểu | Ghi chú |
-|-----|------|---------|
-| user_id | FK → users.id | Người nhận |
-| invoice_id | FK → invoices.id | Hóa đơn liên quan |
-| channel | ENUM | `EMAIL` / `SMS` / `APP_PUSH` |
-| title | VARCHAR(255) | Tiêu đề thông báo |
-| message | TEXT | Nội dung |
-| status | ENUM | `PENDING` / `SENT` / `FAILED` |
-| sent_at | DATETIME | Thời điểm gửi thành công |
-| error_log | TEXT | Log lỗi nếu gửi thất bại |
-
-#### `audit_logs` — Nhật ký hệ thống
-Ghi lại mọi thao tác quan trọng trong hệ thống phục vụ truy vết và kiểm toán.
+| Bảng | Nội dung chính |
+|------|----------------|
+| `users` | Tài khoản (`CITIZEN` / `OFFICER` / `ADMIN`), CCCD, email, SĐT, giới tính, địa chỉ, `must_change_password` |
+| `vehicles` | Phương tiện, biển số, chủ sở hữu, số khung / máy / bảo hiểm, ảnh biển số, `verification_status` (`PENDING` / `APPROVED` / `REJECTED` / `REVISION_REQUESTED`) |
+| `vehicle_verification_history` | Lịch sử công dân xác nhận / phản hồi thông tin phương tiện |
+| `fines` | Mức phạt theo loại vi phạm (`RED_LIGHT`, `WRONG_LANE`, `SPEEDING`, `ILLEGAL_PARKING`, `HELMET_LESS`, `WRONG_WAY`) |
+| `cameras` | Camera giám sát: mã, vị trí, tọa độ, trạng thái, URL luồng / video mẫu |
+| `camera_events` | Sự kiện thô AI ghi nhận từ camera (biển số, độ tin cậy, bounding box) |
+| `violations` | Vi phạm: nguồn (`AI` / `OFFICER`), biển số AI đọc và biển số đã hiệu chỉnh, ảnh bằng chứng, trạng thái `AI_PENDING` → `OFFICER_VERIFIED` / `REJECTED` → `INVOICED` |
+| `invoices` | Hóa đơn phạt: mã, số tiền, hạn nộp, trạng thái `UNPAID` / `PAID` / `OVERDUE` / `CANCELLED` |
+| `notifications` | Thông báo gửi người dùng (`EMAIL` / `SMS` / `APP_PUSH`) |
+| `login_history` | Lịch sử đăng nhập: kết quả, lý do thất bại, IP, user agent |
+| `audit_logs` | Nhật ký thao tác phục vụ truy vết |
 
 ---
 
 ## API Endpoints
 
-Tất cả request cần xác thực phải gửi kèm header:
-```
-Authorization: Bearer <JWT_TOKEN>
-```
+Các endpoint cần xác thực gửi kèm header `Authorization: Bearer <JWT_TOKEN>`.
 
-### Authentication — `/api/auth`
-
+### Xác thực — `/api/auth`
 | Method | Endpoint | Auth | Mô tả |
-|--------|----------|------|-------|
-| POST | `/api/auth/login` | ❌ | Đăng nhập |
-| GET | `/api/auth/me` | ✅ JWT | Lấy thông tin user hiện tại |
+|--------|----------|:----:|-------|
+| POST | `/login` | — | Đăng nhập (`username` là email, CCCD hoặc SĐT) |
+| POST | `/logout` | JWT | Đăng xuất |
+| GET | `/me` | JWT | Thông tin người dùng hiện tại |
+| PATCH | `/change-password` | JWT | Đổi mật khẩu |
 
-**POST /api/auth/login — Request:**
-```json
-{
-  "username": "email@example.com",
-  "password": "password123"
-}
-```
-> `username` có thể là email, số CCCD, hoặc số điện thoại.
-
-**POST /api/auth/login — Response:**
-```json
-{
-  "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
-  "user": {
-    "id": "uuid-string",
-    "fullName": "Nguyễn Văn A",
-    "nationalId": "012345678901",
-    "email": "nguyenvana@email.com",
-    "phone": "0901234567",
-    "role": "CITIZEN"
-  }
-}
-```
-
----
-
-### Citizen API — `/api/citizen`
-> Yêu cầu: JWT hợp lệ + role = `CITIZEN`
-
+### Công dân — `/api/citizen` (role `CITIZEN`)
 | Method | Endpoint | Mô tả |
 |--------|----------|-------|
-| GET | `/api/citizen/dashboard` | Thống kê vi phạm & hóa đơn của công dân |
+| GET | `/dashboard` | Phương tiện, vi phạm, hóa đơn của công dân |
+| POST | `/vehicles/:id/approve` | Xác nhận thông tin phương tiện |
+| POST | `/vehicles/:id/request-revision` | Yêu cầu cán bộ chỉnh sửa thông tin |
+| POST | `/vehicles/:id/reject` | Từ chối thông tin phương tiện |
 
----
-
-### Officer API — `/api/officer`
-> Yêu cầu: JWT hợp lệ + role = `OFFICER` hoặc `ADMIN`
-
+### Cán bộ — `/api/officer` (role `OFFICER` hoặc `ADMIN`)
 | Method | Endpoint | Mô tả |
 |--------|----------|-------|
-| GET | `/api/officer/dashboard` | Thống kê tổng quan toàn hệ thống |
-| GET | `/api/officer/plates` | Tra cứu thông tin xe theo biển số |
-| POST | `/api/officer/scan-plate` | Quét biển số qua AI (upload ảnh) |
-| GET | `/api/officer/citizens` | Danh sách tất cả công dân |
-| POST | `/api/officer/citizens` | Tạo tài khoản công dân mới |
-| PATCH | `/api/officer/citizens/:id` | Cập nhật thông tin công dân |
-| GET | `/api/officer/vehicles` | Danh sách tất cả phương tiện |
-| POST | `/api/officer/vehicles` | Đăng ký phương tiện mới |
-| PATCH | `/api/officer/vehicles/:id` | Cập nhật thông tin phương tiện |
-| POST | `/api/officer/vehicles/:id/transfer` | Chuyển quyền sở hữu xe |
-
----
+| GET | `/dashboard` | Thống kê toàn hệ thống |
+| GET | `/plates?plate=` | Tra cứu theo biển số |
+| POST | `/scan-plate` | Nhận diện biển số từ ảnh (qua AI Service) |
+| POST | `/plate-images` | Tải ảnh biển số / bằng chứng lên Cloudinary |
+| PATCH | `/cameras/:id/video` | Cập nhật / gỡ video mẫu của camera |
+| GET · POST | `/citizens` | Danh sách / thêm công dân |
+| PATCH | `/citizens/:id` | Cập nhật công dân |
+| GET | `/citizens/:id/login-history` | Lịch sử đăng nhập của công dân |
+| GET · POST | `/vehicles` | Danh sách / đăng ký phương tiện |
+| PATCH | `/vehicles/:id` | Cập nhật phương tiện |
+| POST | `/vehicles/:id/transfer` | Chuyển nhượng quyền sở hữu |
+| GET | `/violations/queue` | Hàng đợi vi phạm do AI phát hiện |
+| GET · POST | `/violations` | Danh sách (có lọc) / thêm vi phạm thủ công |
+| GET | `/violations/:id` | Chi tiết vi phạm |
+| POST | `/violations/:id/verify` | Xác minh vi phạm |
+| POST | `/violations/:id/reject` | Từ chối vi phạm |
+| PATCH | `/violations/:id/plate` | Chỉnh sửa biển số |
+| POST | `/violations/:id/invoice` | Phát hành hóa đơn |
+| POST | `/invoices/:id/cancel` | Hủy biên lai |
 
 ### AI Service — `http://localhost:8000`
-
 | Method | Endpoint | Mô tả |
 |--------|----------|-------|
-| GET | `/health` | Kiểm tra trạng thái service |
-| POST | `/api/ai/detect-plate` | Nhận diện biển số từ ảnh upload |
+| GET | `/health` | Kiểm tra trạng thái |
+| POST | `/api/ai/detect-plate` | Nhận diện biển số (`multipart/form-data`, field `file`) |
 
-**POST /api/ai/detect-plate** — nhận `multipart/form-data` với field `file`.
-
-**Response:**
 ```json
 {
   "success": true,
@@ -401,42 +247,50 @@ Authorization: Bearer <JWT_TOKEN>
 
 ## Hướng Dẫn Cài Đặt
 
-### Yêu cầu hệ thống
-- [Docker Desktop](https://www.docker.com/products/docker-desktop/) 4.x+
-- [Node.js](https://nodejs.org/) 20.x LTS
-- Python 3.10+ (để chạy AI Service)
-- Git
+### Yêu cầu
+- Docker Desktop 4.x+
+- Node.js 20 LTS
+- Python 3.10+
+- File model YOLO: `detect_plate.pt`, `read_characters.pt`
 
----
-
-### Bước 1 — Clone dự án
+### 1. Cấu hình môi trường
 
 ```bash
-git clone <repository-url>
-cd DoAnTotNghiep
+cp backend/.env.example backend/.env
 ```
 
-### Bước 2 — Khởi động MySQL và Backend bằng Docker
+Điền thông tin Cloudinary, email và `JWT_SECRET` (xem [Biến Môi Trường](#biến-môi-trường)).
+
+### 2. Khởi động MySQL và Backend
 
 ```bash
-docker compose up -d
+docker compose up -d --build
 ```
 
-Lệnh này sẽ khởi tạo:
-- `DoAnTotNghiep-DB` — MySQL 8.0 tại port `3309`
-- `DoAnTotNghiep-Backend` — Node.js tại port `5000`
+- `DoAnTotNghiep-DB` — MySQL 8.0, cổng `3309`
+- `DoAnTotNghiep-Backend` — API, cổng `5000`
 
-### Bước 3 — Chạy Database Migration và Seed
+### 3. Tạo bảng và dữ liệu mẫu
 
 ```bash
-# Chạy migrations (tạo toàn bộ bảng)
 docker exec DoAnTotNghiep-Backend npm run db:migrate
-
-# Chạy seed (thêm dữ liệu mẫu)
 docker exec DoAnTotNghiep-Backend npm run db:seed
 ```
 
-### Bước 4 — Chạy Frontend
+### 4. Chạy AI Service
+
+```bash
+cd ai-service
+python -m venv venv
+venv\Scripts\activate            # Windows  (Linux/macOS: source venv/bin/activate)
+pip install fastapi uvicorn ultralytics opencv-python numpy python-multipart
+# Đặt models/detect_plate.pt và models/read_characters.pt
+uvicorn main:app --host 0.0.0.0 --port 8000 --reload
+```
+
+> Chỉ cần cài các thư viện trên; `requirements.txt` hiện là bản `pip freeze` của môi trường cá nhân, chứa nhiều gói không liên quan.
+
+### 5. Chạy Frontend
 
 ```bash
 cd frontend
@@ -444,149 +298,92 @@ npm install
 npm run dev
 ```
 
-Frontend chạy tại: `http://localhost:5173`
+Mở `http://localhost:5173`. Vite tự proxy `/api` sang `http://localhost:5000`.
 
-### Bước 5 — Chạy AI Service
-
-```bash
-cd ai-service
-
-# Tạo và kích hoạt virtual environment
-python -m venv venv
-venv\Scripts\activate       # Windows
-# source venv/bin/activate  # Linux / macOS
-
-# Cài dependencies (chỉ cần các thư viện core)
-pip install fastapi uvicorn ultralytics opencv-python numpy python-multipart
-
-# Đảm bảo có file model trong thư mục models/
-# models/detect_plate.pt
-# models/read_characters.pt
-
-# Khởi động server
-uvicorn main:app --host 0.0.0.0 --port 8000 --reload
-```
-
-AI Service chạy tại: `http://localhost:8000`
-
----
-
-### Chạy Backend ở local (không dùng Docker)
-
-Dùng khi cần debug backend trực tiếp:
+### Chạy Backend không dùng Docker (debug)
 
 ```bash
+docker compose up -d mysql-db
 cd backend
 npm install
-
-# Đảm bảo MySQL Docker container đang chạy
-docker compose up mysql-db -d
-
-npm run db:migrate
-npm run db:seed
-npm run dev
-# Server chạy tại http://localhost:5001
+npm run db:migrate && npm run db:seed
+npm run dev                      # http://localhost:5000 (theo PORT trong .env)
 ```
-
-> **Lưu ý:** Khi chạy local, backend dùng port `5001` (theo `.env`). Khi chạy trong Docker, dùng port `5000`.
 
 ---
 
 ## Biến Môi Trường
 
-### Backend — `backend/.env`
+`backend/.env` (mẫu ở `backend/.env.example`). Khi chạy bằng Docker, `docker-compose.yml` ghi đè các biến `PORT`, `DB_*`, `AI_SERVICE_URL`.
 
-```env
-# Môi trường
-NODE_ENV=development
+| Biến | Mô tả |
+|------|-------|
+| `NODE_ENV`, `PORT` | Môi trường, cổng API (mặc định `5000`) |
+| `DB_HOST`, `DB_PORT`, `DB_USER`, `DB_PASSWORD`, `DB_NAME` | Kết nối MySQL (local: `127.0.0.1:3309`, `root/root`, `DoAnTotNghiep`) |
+| `JWT_SECRET` | Khóa ký JWT — **đổi khi triển khai thật** |
+| `AI_SERVICE_URL` | Địa chỉ AI Service (local: `http://localhost:8000`) |
+| `CLOUDINARY_CLOUD_NAME`, `CLOUDINARY_API_KEY`, `CLOUDINARY_API_SECRET`, `CLOUDINARY_FOLDER` | Lưu trữ ảnh |
+| `EMAIL_USER`, `EMAIL_PASS` | Gmail và App Password để gửi tài khoản cho công dân |
 
-# Server
-PORT=5001
+Frontend (tùy chọn): `VITE_API_URL` — URL tuyệt đối của backend khi không dùng proxy của Vite.
 
-# Database MySQL
-DB_HOST=127.0.0.1
-DB_PORT=3309
-DB_USER=root
-DB_PASSWORD=root
-DB_NAME=DoAnTotNghiep
-
-# Xác thực JWT
-JWT_SECRET=super_secret_key_traffic_app
-
-# AI Service URL
-AI_SERVICE_URL=http://localhost:8000
-
-# Roboflow API (OCR fallback)
-ROBOFLOW_API_KEY=your_api_key_here
-ROBOFLOW_API_URL=https://serverless.roboflow.com
-ROBOFLOW_MODEL=vietnam-license-plate-hjswj
-ROBOFLOW_VERSION=2
-ROBOFLOW_OCR_MODEL=ocr-oy9a7
-ROBOFLOW_OCR_VER=1
-```
-
-> ⚠️ **Bảo mật:** Không commit file `.env` lên Git. Thay `JWT_SECRET` bằng một chuỗi ngẫu nhiên an toàn khi deploy production.
+> ⚠️ Không commit file `.env`.
 
 ---
 
-## Chạy Migration & Seed
+## Tài Khoản Mẫu
 
-Knex.js quản lý toàn bộ vòng đời database schema. Tất cả lệnh chạy trong thư mục `backend/`.
+Sau khi chạy seed, mật khẩu mặc định của mọi tài khoản là **`123456`**.
+
+| Vai trò | Email | Ghi chú |
+|---------|-------|---------|
+| Quản trị viên | `admin@traffic.gov.vn` | |
+| Cán bộ công an | `officer@traffic.gov.vn` | |
+| Công dân | `citizen@gmail.com`, `lemai@gmail.com`, `hungpham@gmail.com` | Phải đổi mật khẩu ở lần đăng nhập đầu |
+
+Công dân do cán bộ tạo mới cũng có mật khẩu mặc định `123456` và nhận thông tin tài khoản qua email.
+
+---
+
+## Phân Quyền
+
+| Chức năng | CITIZEN | OFFICER | ADMIN |
+|-----------|:-------:|:-------:|:-----:|
+| Đăng nhập, đổi mật khẩu | ✅ | ✅ | ✅ |
+| Xem phương tiện, vi phạm, hóa đơn của bản thân | ✅ | — | — |
+| Xác nhận / phản hồi thông tin phương tiện | ✅ | — | — |
+| Quét, tra cứu biển số | ❌ | ✅ | ✅ |
+| Quản lý công dân, phương tiện | ❌ | ✅ | ✅ |
+| Quản lý vi phạm, duyệt hàng đợi AI | ❌ | ✅ | ✅ |
+| Phát hành, hủy hóa đơn | ❌ | ✅ | ✅ |
+| Giám sát camera, xem báo cáo | ❌ | ✅ | ✅ |
+
+> Hiện `ADMIN` dùng chung quyền với `OFFICER` (`requireRoles('OFFICER', 'ADMIN')`), chưa có chức năng riêng cho quản trị viên.
+
+---
+
+## Tài Liệu Thiết Kế
+
+| Tài liệu | Đường dẫn |
+|----------|-----------|
+| Lược đồ quan hệ CSDL | [`docs/LuocDoQuanHe.png`](docs/LuocDoQuanHe.png) |
+| Use case tổng quát | [`docs/usecase/UseCaseTongQuat.png`](docs/usecase/UseCaseTongQuat.png) |
+| Use case phân rã (10 chức năng) | [`docs/usecase/phan_ra/`](docs/usecase/phan_ra/) |
+
+Sơ đồ use case được sinh từ script Python (matplotlib), chỉnh sửa rồi chạy lại:
 
 ```bash
-cd backend
-
-# Apply tất cả migrations chưa chạy
-npm run db:migrate
-
-# Rollback batch migrations gần nhất
-npx knex migrate:rollback
-
-# Xem trạng thái từng migration
-npx knex migrate:status
-
-# Chạy seed data
-npm run db:seed
+python docs/usecase/ve_usecase_tong_quat.py docs/usecase/UseCaseTongQuat.png
+python docs/usecase/ve_usecase_phan_ra.py
 ```
-
-**Thứ tự migrations (quan trọng — phụ thuộc lẫn nhau):**
-
-```
-001_create_users_table.js         — Bảng gốc, không phụ thuộc
-002_create_vehicles_table.js      — FK → users
-003_create_fines_table.js         — Độc lập (bảng tra cứu)
-004_create_cameras_table.js       — Độc lập
-005_create_violations_table.js    — FK → cameras, vehicles, users
-006_create_camera_events_table.js — FK → cameras, violations
-007_create_invoices_table.js      — FK → violations
-008_create_notifications_table.js — FK → users, invoices
-009_create_audit_logs_table.js    — Log độc lập
-```
-
----
-
-## Phân Quyền Hệ Thống
-
-| Tính năng | CITIZEN | OFFICER | ADMIN |
-|-----------|:-------:|:-------:|:-----:|
-| Xem vi phạm của bản thân | ✅ | ✅ | ✅ |
-| Xem hóa đơn của bản thân | ✅ | ✅ | ✅ |
-| Quản lý phương tiện của bản thân | ✅ | ✅ | ✅ |
-| Tra cứu biển số xe bất kỳ | ❌ | ✅ | ✅ |
-| Quét biển số qua AI | ❌ | ✅ | ✅ |
-| Tạo & quản lý tài khoản công dân | ❌ | ✅ | ✅ |
-| Tạo & quản lý phương tiện bất kỳ | ❌ | ✅ | ✅ |
-| Chuyển quyền sở hữu xe | ❌ | ✅ | ✅ |
-| Xác minh / từ chối vi phạm | ❌ | ✅ | ✅ |
-| Quản lý camera hệ thống | ❌ | ❌ | ✅ |
-| Quản lý toàn bộ hệ thống | ❌ | ❌ | ✅ |
 
 ---
 
 ## Ghi Chú Phát Triển
 
-- **Port backend:** `5001` khi chạy local (theo `.env`), `5000` khi chạy trong Docker
-- **Port MySQL:** expose ra host ở `3309` để tránh xung đột với MySQL local (mặc định `3306`)
-- **AI model files:** Không commit file `.pt` lên Git do kích thước lớn. Đặt thủ công vào `ai-service/models/`
-- **TanStack Router:** Chạy `npm run dev` để tự động generate lại `src/routeTree.gen.ts` khi thêm route mới
-- **Knex migrations:** Đặt tên file với prefix số thứ tự (`001_`, `002_`...) để đảm bảo thứ tự chạy đúng
+- **Lệnh database** (trong `backend/`): `npm run db:migrate`, `npm run db:seed`, `npm run db:rollback` (rollback toàn bộ), `npm run db:reset` (rollback → migrate → seed)
+- **Migration:** bảng gốc đặt tiền tố `001_` … `009_`; thay đổi bổ sung đặt tiền tố ngày `YYYYMMDD_` để đảm bảo thứ tự chạy
+- **Cổng MySQL** expose ra `3309` để tránh trùng MySQL cài sẵn (`3306`)
+- **Model AI** (`.pt`) không commit do dung lượng lớn — đặt thủ công vào `ai-service/models/`
+- **TanStack Router:** `src/routeTree.gen.ts` được sinh tự động khi chạy `npm run dev` / `npm run build`
+- **AI Service trong Docker:** đã có `ai-service/Dockerfile` và khối cấu hình (đang comment) trong `docker-compose.yml`; khi bật, đổi `AI_SERVICE_URL` của backend thành `http://ai-service:8000`

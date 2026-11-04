@@ -8,6 +8,7 @@ const cors = require('cors');
 const authRoutes = require('./routes/authRoutes');
 const citizenRoutes = require('./routes/citizenRoutes');
 const officerRoutes = require('./routes/officerRoutes');
+const { startMonitoringLoop } = require('./services/cameraMonitoring');
 
 const app = express();
 
@@ -52,6 +53,8 @@ app.use((err, req, res, next) => {
 
 // 6. Start Server
 const PORT = process.env.PORT || 5000;
+startMonitoringLoop();
+
 app.listen(PORT, () => {
   console.log(`✅ Backend Server đang chạy tại: http://localhost:${PORT}`);
   console.log(`✅ Health check: http://localhost:${PORT}/health`);

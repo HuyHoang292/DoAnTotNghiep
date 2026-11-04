@@ -9,7 +9,7 @@ import {
   type ViolationDetail,
   type ViolationHistory,
 } from '@/lib/api'
-import { PageHeader, Modal } from '@/components/ui'
+import { PageHeader, Modal, PlateCloseup } from '@/components/ui'
 import { formatDateTime, formatDate, formatCurrency } from '@/lib/format'
 import {
   VIOLATION_TYPE_LABEL,
@@ -213,6 +213,7 @@ function ViolationDetailPage() {
         {/* Left Column */}
         <div className="space-y-4 xl:col-span-2">
           {/* Evidence Image */}
+          <PlateCloseup src={violation.plateImageUrl} className="shadow-sm" />
           <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
             <img
               src={violation.evidenceImageUrl}

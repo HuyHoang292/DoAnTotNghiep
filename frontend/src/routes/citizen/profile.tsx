@@ -1,9 +1,11 @@
 import { createFileRoute } from '@tanstack/react-router'
-import { useState } from 'react'
-import { KeyRound, User } from 'lucide-react'
+import { useEffect, useState } from 'react'
+import { Contact, KeyRound, User } from 'lucide-react'
 import { useAuth } from '@/lib/auth'
-import { changePasswordRequest } from '@/lib/api'
+import { changePasswordRequest, getMyDriverLicensesRequest } from '@/lib/api'
+import type { DriverLicense } from '@/lib/types'
 import { PageHeader } from '@/components/ui'
+import { DriverLicenseList } from '@/components/DriverLicenseList'
 
 export const Route = createFileRoute('/citizen/profile')({
   component: CitizenProfile,
@@ -22,6 +24,22 @@ function CitizenProfile() {
   const [confirmPass, setConfirmPass] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [msg, setMsg] = useState<{ type: 'ok' | 'err'; text: string } | null>(null)
+  const [licenses, setLicenses] = useState<DriverLicense[] | null>(null)
+  const [licenseError, setLicenseError] = useState('')
+
+  useEffect(() => {
+    let cancelled = false
+    getMyDriverLicensesRequest()
+      .then((res) => {
+        if (!cancelled) setLicenses(res.licenses ?? [])
+      })
+      .catch((err) => {
+        if (!cancelled) setLicenseError(err instanceof Error ? err.message : 'Không tải được giấy phép lái xe.')
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [])
 
   if (!user) return null
 
@@ -161,6 +179,27 @@ function CitizenProfile() {
 
           <p className="mt-4 text-xs text-slate-400">
             Mật khẩu được mã hoá (bcrypt) trước khi lưu. Hệ thống không lưu mật khẩu dạng văn bản.
+          </p>
+        </section>
+
+        {/* Giấy phép lái xe */}
+        <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm lg:col-span-2">
+          <h2 className="mb-4 flex items-center gap-2 font-semibold text-slate-900">
+            <Contact className="h-4 w-4 text-blue-600" />
+            Giấy phép lái xe
+          </h2>
+          {licenseError ? (
+            <p className="text-sm text-red-600">{licenseError}</p>
+          ) : licenses === null ? (
+            <p className="text-sm text-slate-400">Đang tải...</p>
+          ) : (
+            <DriverLicenseList
+              licenses={licenses}
+              emptyText="Bạn chưa có giấy phép lái xe nào trong hệ thống."
+            />
+          )}
+          <p className="mt-4 text-xs text-slate-400">
+            Thông tin GPLX do cơ quan Công an cập nhật. Liên hệ cơ quan chức năng nếu có sai sót.
           </p>
         </section>
       </div>

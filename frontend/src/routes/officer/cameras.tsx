@@ -7,16 +7,41 @@ import {
   Loader2,
   MapPin,
   Maximize2,
+  Pencil,
+  Repeat,
+  ScanEye,
   Search,
+  Settings2,
+  Square,
+  TrafficCone,
   Wifi,
   WifiOff,
   Wrench,
   X,
 } from 'lucide-react'
-import { getOfficerDashboard, updateCameraVideoRequest } from '@/lib/api'
+import {
+  getCameraMonitoringRequest,
+  getOfficerDashboard,
+  startCameraMonitoringRequest,
+  stopCameraMonitoringRequest,
+  updateCameraRedLightConfigRequest,
+  updateCameraVideoRequest,
+} from '@/lib/api'
 import { formatDateTime } from '@/lib/format'
-import { CAMERA_STATUS_LABEL, type Camera, type CameraStatus, type Violation } from '@/lib/types'
+import {
+  CAMERA_STATUS_LABEL,
+  type Camera,
+  type CameraEvent,
+  type CameraStatus,
+  type MonitoringStatus,
+  type NormalizedBox,
+  type SimulatedSignalConfig,
+  type StopLine,
+  type Violation,
+} from '@/lib/types'
 import { EmptyState, Modal, PageHeader, StatCard } from '@/components/ui'
+import { LiveFeed } from '@/components/LiveFeed'
+import { RedLightVideo } from '@/components/RedLightVideo'
 
 export const Route = createFileRoute('/officer/cameras')({
   component: OfficerCameras,
@@ -45,6 +70,7 @@ function OfficerCameras() {
   const [q, setQ] = useState('')
   const [editingVideo, setEditingVideo] = useState<Camera | null>(null)
   const [watching, setWatching] = useState<Camera | null>(null)
+  const [configuring, setConfiguring] = useState<Camera | null>(null)
 
   const replaceCamera = (next: Camera) => setCameras((prev) => prev.map((c) => (c.id === next.id ? next : c)))
 
@@ -171,7 +197,20 @@ function OfficerCameras() {
 
                 {/* Khung hình: video mẫu nếu có, nếu không thì ảnh vi phạm gần nhất */}
                 <div className="relative aspect-video overflow-hidden rounded-xl bg-slate-900">
-                  {camera.videoUrl ? (
+                  {camera.monitoring ? (
+                    <button type="button" onClick={() => setWatching(camera)} className="block h-full w-full" title="Xem lớn">
+                      <LiveFeed
+                        cameraId={camera.id}
+                        intervalMs={500}
+                        alt={`Giám sát trực tiếp tại ${camera.locationName}`}
+                        className="h-full w-full object-cover"
+                      />
+                      <span className="absolute left-2 top-2 flex items-center gap-1.5 rounded bg-black/60 px-1.5 py-0.5 font-mono text-[10px] font-semibold text-emerald-300">
+                        <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-400" />
+                        AI ĐANG GIÁM SÁT
+                      </span>
+                    </button>
+                  ) : camera.videoUrl ? (
                     <>
                       <video
                         src={camera.videoUrl}
@@ -221,14 +260,30 @@ function OfficerCameras() {
                   )}
                 </div>
 
-                <button
-                  type="button"
-                  onClick={() => setEditingVideo(camera)}
-                  className="inline-flex items-center justify-center gap-1.5 rounded-xl border border-slate-200 px-3 py-2 text-xs font-medium text-slate-600 hover:border-blue-400 hover:text-blue-600"
-                >
-                  <Film className="h-3.5 w-3.5" />
-                  {camera.videoUrl ? 'Đổi video' : 'Gắn video'}
-                </button>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setEditingVideo(camera)}
+                    className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-xl border border-slate-200 px-3 py-2 text-xs font-medium text-slate-600 hover:border-blue-400 hover:text-blue-600"
+                  >
+                    <Film className="h-3.5 w-3.5" />
+                    {camera.videoUrl ? 'Đổi video' : 'Gắn video'}
+                  </button>
+                  {camera.videoUrl && (
+                    <button
+                      type="button"
+                      onClick={() => setConfiguring(camera)}
+                      className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-xl border border-slate-200 px-3 py-2 text-xs font-medium text-slate-600 hover:border-blue-400 hover:text-blue-600"
+                    >
+                      <Settings2 className="h-3.5 w-3.5" />
+                      Vạch và đèn
+                    </button>
+                  )}
+                </div>
+
+                {camera.videoUrl && (
+                  <MonitoringToggle camera={camera} onChanged={replaceCamera} />
+                )}
 
                 <div className="mt-auto flex items-end justify-between border-t border-slate-100 pt-3">
                   <div>
@@ -250,8 +305,22 @@ function OfficerCameras() {
 
       {watching?.videoUrl && (
         <Modal title={watching.locationName} description={watching.roadSegment} onClose={() => setWatching(null)} wide>
-          <video src={watching.videoUrl} controls autoPlay muted loop playsInline className="w-full rounded-xl bg-black" />
+          {cameras.find((c) => c.id === watching.id)?.monitoring ? (
+            <MonitoringPanel camera={watching} />
+          ) : (
+            <video src={watching.videoUrl} controls autoPlay muted loop playsInline className="w-full rounded-xl bg-black" />
+          )}
         </Modal>
+      )}
+
+      {configuring?.videoUrl && (
+        <RedLightConfigModal
+          camera={configuring}
+          onClose={() => setConfiguring(null)}
+          onSaved={(next) => {
+            replaceCamera(next)
+          }}
+        />
       )}
 
       {editingVideo && (
@@ -265,6 +334,335 @@ function OfficerCameras() {
         />
       )}
     </>
+  )
+}
+
+function MonitoringToggle({ camera, onChanged }: { camera: Camera; onChanged: (camera: Camera) => void }) {
+  const [busy, setBusy] = useState(false)
+  const [toggleError, setToggleError] = useState('')
+
+  const toggle = async () => {
+    setBusy(true)
+    setToggleError('')
+    try {
+      const res = camera.monitoring
+        ? await stopCameraMonitoringRequest(camera.id)
+        : await startCameraMonitoringRequest(camera.id)
+      onChanged(res.camera)
+    } catch (err) {
+      setToggleError(err instanceof Error ? err.message : 'Không đổi được trạng thái giám sát.')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <div>
+      <button
+        type="button"
+        disabled={busy}
+        onClick={() => void toggle()}
+        className={`inline-flex w-full items-center justify-center gap-2 rounded-xl px-3 py-2 text-sm font-semibold disabled:opacity-60 ${
+          camera.monitoring
+            ? 'border border-red-200 bg-red-50 text-red-700 hover:border-red-400'
+            : 'bg-blue-600 text-white hover:bg-blue-700'
+        }`}
+      >
+        {busy ? (
+          <Loader2 className="h-4 w-4 animate-spin" />
+        ) : camera.monitoring ? (
+          <Square className="h-4 w-4" />
+        ) : (
+          <ScanEye className="h-4 w-4" />
+        )}
+        {camera.monitoring ? 'Tắt AI giám sát' : 'Bật AI giám sát'}
+      </button>
+      {toggleError && <p className="mt-1 text-xs text-red-600">{toggleError}</p>}
+    </div>
+  )
+}
+
+const SIGNAL_LABEL: Record<NonNullable<MonitoringStatus['signalState']>, { text: string; tone: string }> = {
+  RED: { text: 'Đèn đỏ', tone: 'text-red-600' },
+  YELLOW: { text: 'Đèn vàng', tone: 'text-amber-600' },
+  GREEN: { text: 'Đèn xanh', tone: 'text-emerald-600' },
+  UNKNOWN: { text: 'Chưa rõ đèn', tone: 'text-slate-500' },
+}
+
+function MonitoringPanel({ camera }: { camera: Camera }) {
+  const [status, setStatus] = useState<MonitoringStatus | null>(null)
+  const [events, setEvents] = useState<CameraEvent[]>([])
+
+  useEffect(() => {
+    let cancelled = false
+    let timer: number | undefined
+    const poll = async () => {
+      try {
+        const res = await getCameraMonitoringRequest(camera.id)
+        if (cancelled) return
+        setStatus(res.status)
+        setEvents(res.events)
+      } catch {
+        // Giữ số liệu cũ và thử lại ở lần sau
+      }
+      if (!cancelled) timer = window.setTimeout(() => void poll(), 2000)
+    }
+    void poll()
+    return () => {
+      cancelled = true
+      window.clearTimeout(timer)
+    }
+  }, [camera.id])
+
+  const signal = SIGNAL_LABEL[status?.signalState ?? 'UNKNOWN']
+
+  return (
+    <div className="space-y-3">
+      <div className="overflow-hidden rounded-xl bg-slate-900">
+        <LiveFeed cameraId={camera.id} alt={`Giám sát trực tiếp tại ${camera.locationName}`} className="w-full" />
+      </div>
+
+      {status?.status === 'FAILED' && <p className="text-sm text-red-600">AI gặp lỗi: {status.error}</p>}
+      {status?.status === 'AI_OFFLINE' && <p className="text-sm text-red-600">Không kết nối được AI service.</p>}
+
+      <dl className="grid grid-cols-2 gap-2 text-sm sm:grid-cols-4">
+        <div className="rounded-xl bg-slate-50 px-3 py-2">
+          <dt className="text-xs text-slate-500">Tín hiệu</dt>
+          <dd className={`font-semibold ${signal.tone}`}>{signal.text}</dd>
+        </div>
+        <div className="rounded-xl bg-slate-50 px-3 py-2">
+          <dt className="text-xs text-slate-500">Qua vạch hợp lệ</dt>
+          <dd className="font-semibold text-slate-900">{status?.crossedAllowed ?? 0}</dd>
+        </div>
+        <div className="rounded-xl bg-slate-50 px-3 py-2">
+          <dt className="text-xs text-slate-500">Vi phạm vòng này</dt>
+          <dd className="font-semibold text-slate-900">{status?.violations ?? 0}</dd>
+        </div>
+        <div className="rounded-xl bg-slate-50 px-3 py-2">
+          <dt className="text-xs text-slate-500">Tốc độ xử lý</dt>
+          <dd className="font-semibold text-slate-900">{status?.processingFps ?? 0} hình/giây</dd>
+        </div>
+      </dl>
+
+      <div>
+        <div className="mb-2 flex items-center justify-between">
+          <h3 className="text-sm font-semibold text-slate-900">Vi phạm AI vừa ghi nhận</h3>
+          <Link to="/officer/violation_queues" className="text-xs font-medium text-blue-600 hover:underline">
+            Xem hàng đợi
+          </Link>
+        </div>
+        {events.length === 0 ? (
+          <p className="rounded-xl bg-slate-50 px-3 py-4 text-center text-sm text-slate-500">Chưa có vi phạm nào.</p>
+        ) : (
+          <ul className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+            {events.map((event) => (
+              <li key={event.id} className="overflow-hidden rounded-xl border border-slate-200">
+                {event.snapshotUrl && (
+                  <img src={event.snapshotUrl} alt="Ảnh bằng chứng vi phạm" loading="lazy" className="aspect-video w-full object-cover" />
+                )}
+                <div className="px-2 py-1.5 text-xs">
+                  <p className="truncate font-mono font-semibold text-slate-900">{event.plate || 'Chưa đọc được biển'}</p>
+                  <p className="text-slate-500">
+                    {event.signalState === 'YELLOW' ? 'Đèn vàng' : 'Đèn đỏ'} · {formatDateTime(event.createdAt)}
+                  </p>
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+    </div>
+  )
+}
+
+const DEFAULT_SIGNAL: SimulatedSignalConfig = { mode: 'SIMULATED', green: 20, yellow: 3, red: 20, offset: 0 }
+
+const SIGNAL_FIELDS: { key: 'green' | 'yellow' | 'red' | 'offset'; label: string }[] = [
+  { key: 'green', label: 'Xanh (giây)' },
+  { key: 'yellow', label: 'Vàng (giây)' },
+  { key: 'red', label: 'Đỏ (giây)' },
+  { key: 'offset', label: 'Lệch pha (giây)' },
+]
+
+type DrawTarget = 'line' | 'roi'
+
+function RedLightConfigModal({
+  camera,
+  onClose,
+  onSaved,
+}: {
+  camera: Camera
+  onClose: () => void
+  onSaved: (camera: Camera) => void
+}) {
+  const saved = camera.signalConfig
+  const [stopLine, setStopLine] = useState<StopLine | null>(camera.stopLine ?? null)
+  const [mode, setMode] = useState<'VISION' | 'SIMULATED'>(saved?.mode === 'VISION' ? 'VISION' : 'SIMULATED')
+  const [roi, setRoi] = useState<NormalizedBox | null>(saved?.mode === 'VISION' ? saved.roi : null)
+  const [signal, setSignal] = useState<SimulatedSignalConfig>(saved && saved.mode !== 'VISION' ? saved : DEFAULT_SIGNAL)
+  const [drawing, setDrawing] = useState<DrawTarget | null>(null)
+  const [draftPoint, setDraftPoint] = useState<{ x: number; y: number } | null>(null)
+  const [saving, setSaving] = useState(false)
+  const [formError, setFormError] = useState('')
+
+  const startDrawing = (target: DrawTarget) => {
+    setDrawing((current) => (current === target ? null : target))
+    setDraftPoint(null)
+  }
+
+  const pickPoint = (x: number, y: number) => {
+    if (!draftPoint) {
+      setDraftPoint({ x, y })
+      return
+    }
+    if (drawing === 'roi') {
+      setRoi({
+        x1: Math.min(draftPoint.x, x),
+        y1: Math.min(draftPoint.y, y),
+        x2: Math.max(draftPoint.x, x),
+        y2: Math.max(draftPoint.y, y),
+      })
+    } else {
+      setStopLine({ x1: draftPoint.x, y1: draftPoint.y, x2: x, y2: y, travelSide: stopLine?.travelSide ?? 1 })
+    }
+    setDraftPoint(null)
+    setDrawing(null)
+  }
+
+  const handleSave = async () => {
+    if (!stopLine) {
+      setFormError('Vui lòng vẽ vạch dừng trên video.')
+      return
+    }
+    if (mode === 'VISION' && !roi) {
+      setFormError('Vui lòng khoanh vùng 3 bóng đèn trên video.')
+      return
+    }
+    setFormError('')
+    setSaving(true)
+    try {
+      const config = mode === 'VISION' ? { mode: 'VISION' as const, roi: roi! } : { ...signal, mode: 'SIMULATED' as const }
+      const res = await updateCameraRedLightConfigRequest(camera.id, stopLine, config)
+      onSaved(res.camera)
+      onClose()
+    } catch (err) {
+      setFormError(err instanceof Error ? err.message : 'Không lưu được cấu hình.')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const hint = drawing
+    ? draftPoint
+      ? drawing === 'roi' ? 'Bấm góc đối diện của vùng đèn.' : 'Bấm điểm cuối của vạch.'
+      : drawing === 'roi' ? 'Bấm một góc của vùng đèn.' : 'Bấm điểm đầu của vạch.'
+    : 'Vạch chỉ áp dụng cho các làn nó phủ, nên chừa làn rẽ phải và làn ngược chiều.'
+
+  return (
+    <Modal
+      title="Vạch dừng và đèn giao thông"
+      description={`${camera.locationName} — xe cắt vạch theo đúng chiều mũi tên khi đèn đỏ hoặc vàng sẽ vào hàng đợi chờ duyệt.`}
+      onClose={onClose}
+      wide
+    >
+      <div className="space-y-3">
+        <RedLightVideo
+          src={camera.videoUrl!}
+          stopLine={stopLine}
+          signalConfig={mode === 'SIMULATED' ? signal : null}
+          roi={mode === 'VISION' ? roi : null}
+          draftPoint={draftPoint}
+          drawing={Boolean(drawing)}
+          onPick={pickPoint}
+        />
+
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            onClick={() => startDrawing('line')}
+            className={`inline-flex items-center gap-1.5 rounded-xl border px-3 py-2 text-xs font-medium ${
+              drawing === 'line' ? 'border-blue-500 bg-blue-50 text-blue-700' : 'border-slate-200 text-slate-600 hover:border-blue-400'
+            }`}
+          >
+            <Pencil className="h-3.5 w-3.5" />
+            {drawing === 'line' ? 'Hủy vẽ' : 'Vẽ vạch dừng'}
+          </button>
+          <button
+            type="button"
+            disabled={!stopLine}
+            onClick={() => setStopLine((line) => line && { ...line, travelSide: line.travelSide === 1 ? -1 : 1 })}
+            className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 px-3 py-2 text-xs font-medium text-slate-600 hover:border-blue-400 disabled:opacity-50"
+          >
+            <Repeat className="h-3.5 w-3.5" />
+            Đảo chiều xe
+          </button>
+          {mode === 'VISION' && (
+            <button
+              type="button"
+              onClick={() => startDrawing('roi')}
+              className={`inline-flex items-center gap-1.5 rounded-xl border px-3 py-2 text-xs font-medium ${
+                drawing === 'roi' ? 'border-blue-500 bg-blue-50 text-blue-700' : 'border-slate-200 text-slate-600 hover:border-blue-400'
+              }`}
+            >
+              <TrafficCone className="h-3.5 w-3.5" />
+              {drawing === 'roi' ? 'Hủy khoanh' : 'Khoanh vùng đèn'}
+            </button>
+          )}
+          <p className="text-xs text-slate-500">{hint}</p>
+        </div>
+
+        <label className="block text-xs font-medium text-slate-600">
+          Nguồn tín hiệu đèn
+          <select
+            value={mode}
+            onChange={(e) => setMode(e.target.value as 'VISION' | 'SIMULATED')}
+            className="mt-1 h-9 w-full rounded-lg border border-slate-200 bg-white px-2 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+          >
+            <option value="VISION">Đọc đèn thật trong hình (khoanh đúng 3 bóng đèn xếp dọc)</option>
+            <option value="SIMULATED">Giả lập theo chu kỳ (camera không nhìn thấy đèn)</option>
+          </select>
+        </label>
+
+        {mode === 'SIMULATED' && (
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+            {SIGNAL_FIELDS.map(({ key, label }) => (
+              <label key={key} className="text-xs font-medium text-slate-600">
+                {label}
+                <input
+                  type="number"
+                  min={0}
+                  step={1}
+                  value={signal[key]}
+                  onChange={(e) => setSignal((prev) => ({ ...prev, [key]: Number(e.target.value) }))}
+                  className="mt-1 h-9 w-full rounded-lg border border-slate-200 px-2 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                />
+              </label>
+            ))}
+          </div>
+        )}
+
+        {formError && <p className="text-sm text-red-600">{formError}</p>}
+
+        <div className="flex justify-end gap-2 pt-1">
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-xl border border-slate-200 px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50"
+          >
+            Hủy
+          </button>
+          <button
+            type="button"
+            disabled={saving}
+            onClick={() => void handleSave()}
+            className="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-60"
+          >
+            {saving && <Loader2 className="h-4 w-4 animate-spin" />}
+            Lưu cấu hình
+          </button>
+        </div>
+      </div>
+    </Modal>
   )
 }
 

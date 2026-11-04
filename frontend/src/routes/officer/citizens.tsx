@@ -1,15 +1,31 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { useEffect, useMemo, useState } from 'react'
-import { Loader2, Pencil, Plus, Search, Users, X } from 'lucide-react'
+import { Loader2, LogIn, Pencil, Plus, Search, Trash2, Users, X } from 'lucide-react'
 import {
   createCitizenRequest,
+  createDriverLicenseRequest,
+  deleteDriverLicenseRequest,
+  getCitizenLoginHistoryRequest,
   getOfficerDashboard,
+  listCitizenDriverLicensesRequest,
   listCitizensRequest,
   updateCitizenRequest,
+  updateDriverLicenseRequest,
+  type DriverLicensePayload,
 } from '@/lib/api'
 import { formatDateTime } from '@/lib/format'
-import type { Vehicle, VehicleOwner, Violation } from '@/lib/types'
+import {
+  DRIVER_LICENSE_CLASSES,
+  DRIVER_LICENSE_STATUS_LABEL,
+  type DriverLicense,
+  type DriverLicenseStatus,
+  type LoginHistoryEntry,
+  type Vehicle,
+  type VehicleOwner,
+  type Violation,
+} from '@/lib/types'
 import { EmptyState, Modal, PageHeader, StatCard, ViolationStatusBadge } from '@/components/ui'
+import { DriverLicenseClassChip, DriverLicenseList } from '@/components/DriverLicenseList'
 
 export const Route = createFileRoute('/officer/citizens')({
   component: OfficerCitizens,
@@ -118,8 +134,7 @@ function OfficerCitizens() {
           {notice}
         </div>
       )}
-
-      <div className="grid gap-3 sm:grid-cols-3">
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <StatCard
           label="Tổng công dân"
           value={citizens.length}
@@ -145,7 +160,6 @@ function OfficerCitizens() {
           tone="danger"
         />
       </div>
-
       <div className="flex flex-col gap-2 rounded-2xl border border-slate-200 bg-white p-3 shadow-sm sm:flex-row sm:items-center">
         <div className="flex flex-1 items-center gap-2 px-2">
           <Search className="h-4 w-4 shrink-0 text-slate-400" />
@@ -201,6 +215,8 @@ function OfficerCitizens() {
                     <th className="px-4 py-3 text-left">CCCD</th>
                     <th className="px-4 py-3 text-left">Liên hệ</th>
                     <th className="px-4 py-3 text-left">Địa chỉ</th>
+                    <th className="px-4 py-3 text-left">Bằng lái</th>
+                    <th className="px-4 py-3 text-left">Đăng nhập</th>
                     <th className="px-4 py-3 text-right">Xe</th>
                     <th className="px-4 py-3 text-right">Vi phạm</th>
                     <th className="px-4 py-3 text-right">Thao tác</th>
@@ -229,6 +245,29 @@ function OfficerCitizens() {
                         </td>
                         <td className="px-4 py-3 text-slate-600">
                           {shortAddress || c.address || '—'}
+                        </td>
+                        <td className="px-4 py-3">
+                          {c.driverLicenses?.length ? (
+                            <div className="flex flex-wrap gap-1">
+                              {c.driverLicenses.map((l: { licenseClass: string; status: DriverLicenseStatus }) => (
+                                <DriverLicenseClassChip
+                                  key={l.licenseClass}
+                                  licenseClass={l.licenseClass}
+                                  status={l.status}
+                                />
+                              ))}
+                            </div>
+                          ) : (
+                            <span className="text-slate-400">—</span>
+                          )}
+                        </td>
+                        <td className="px-4 py-3">
+                          <LoginStatusBadge citizen={c} />
+                          {c.lastLoginAt && (
+                            <span className="block text-xs text-slate-400">
+                              {formatDateTime(c.lastLoginAt)}
+                            </span>
+                          )}
                         </td>
                         <td className="px-4 py-3 text-right">{owned.length}</td>
                         <td className="px-4 py-3 text-right font-semibold">
@@ -301,6 +340,12 @@ function OfficerCitizens() {
             setEditing(viewing)
             setViewing(null)
           }}
+          onLicensesChanged={() => {
+            // Làm mới cột "Bằng lái" trong bảng; lỗi tải lại không chặn thao tác vừa thành công
+            listCitizensRequest()
+              .then((cd) => setCitizens(cd.users ?? []))
+              .catch(() => {})
+          }}
         />
       )}
 
@@ -344,6 +389,7 @@ function CitizenDetailModal({
   violations,
   onClose,
   onEdit,
+  onLicensesChanged,
 }: {
   citizen: VehicleOwner & {
     dateOfBirth?: string
@@ -357,6 +403,7 @@ function CitizenDetailModal({
   violations: Violation[]
   onClose: () => void
   onEdit: () => void
+  onLicensesChanged: () => void
 }) {
   const owned = vehicles.filter((v) => v.ownerId === citizen.id)
   const ownedVios = violations.filter((v) => owned.some((o) => o.id === v.vehicleId))
@@ -388,7 +435,16 @@ function CitizenDetailModal({
         <InfoRow label="Địa chỉ đầy đủ" value={fullAddress || '—'} />
         <InfoRow label="Vai trò" value={citizen.role || 'CITIZEN'} />
         <InfoRow label="Trạng thái" value={citizen.status || 'ACTIVE'} />
+        <InfoRow
+          label="Đăng nhập gần nhất"
+          value={citizen.lastLoginAt ? formatDateTime(citizen.lastLoginAt) : 'Chưa từng đăng nhập'}
+        />
+        <InfoRow label="Số lần đăng nhập" value={String(citizen.loginCount ?? 0)} />
       </dl>
+
+      <DriverLicenseSection citizenId={citizen.id} onChanged={onLicensesChanged} />
+
+      <LoginHistorySection citizenId={citizen.id} />
 
       <div className="mt-4">
         <p className="mb-2 text-sm font-semibold text-slate-700">Phương tiện</p>
@@ -647,6 +703,337 @@ function CitizenFormModal({
         </div>
       </form>
     </Modal>
+  )
+}
+
+function LoginStatusBadge({ citizen }: { citizen: VehicleOwner }) {
+  if (citizen.isOnline) {
+    return (
+      <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-700">
+        <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+        Đang đăng nhập
+      </span>
+    )
+  }
+  if ((citizen.loginCount ?? 0) > 0) {
+    return (
+      <span className="inline-flex rounded-full bg-blue-50 px-2 py-0.5 text-xs font-medium text-blue-700">
+        Đã đăng nhập
+      </span>
+    )
+  }
+  return (
+    <span className="inline-flex rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-500">
+      Chưa đăng nhập
+    </span>
+  )
+}
+
+function DriverLicenseSection({ citizenId, onChanged }: { citizenId: string; onChanged: () => void }) {
+  const [licenses, setLicenses] = useState<DriverLicense[] | null>(null)
+  const [error, setError] = useState('')
+  // null: đóng form, 'new': thêm mới, còn lại: bằng đang sửa
+  const [editing, setEditing] = useState<DriverLicense | 'new' | null>(null)
+  const [deletingId, setDeletingId] = useState<string | null>(null)
+
+  const reload = async () => {
+    const res = await listCitizenDriverLicensesRequest(citizenId)
+    setLicenses(res.licenses ?? [])
+  }
+
+  useEffect(() => {
+    let cancelled = false
+    listCitizenDriverLicensesRequest(citizenId)
+      .then((res) => {
+        if (!cancelled) setLicenses(res.licenses ?? [])
+      })
+      .catch((err) => {
+        if (!cancelled) setError(err instanceof Error ? err.message : 'Không tải được giấy phép lái xe.')
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [citizenId])
+
+  const handleDelete = async (license: DriverLicense) => {
+    if (!window.confirm(`Xoá GPLX hạng ${license.licenseClass} - số ${license.licenseNumber}?`)) return
+    setDeletingId(license.id)
+    try {
+      await deleteDriverLicenseRequest(license.id)
+      await reload()
+      onChanged()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Không xoá được giấy phép lái xe.')
+    } finally {
+      setDeletingId(null)
+    }
+  }
+
+  return (
+    <div className="mt-4">
+      <div className="mb-2 flex items-center justify-between">
+        <p className="text-sm font-semibold text-slate-700">Giấy phép lái xe</p>
+        {editing === null && licenses !== null && (
+          <button
+            type="button"
+            onClick={() => setEditing('new')}
+            className="inline-flex items-center gap-1 rounded-lg border border-slate-200 px-2.5 py-1 text-xs font-medium hover:border-blue-400 hover:text-blue-600"
+          >
+            <Plus className="h-3.5 w-3.5" /> Thêm GPLX
+          </button>
+        )}
+      </div>
+
+      {error && <p className="mb-2 text-sm text-red-600">{error}</p>}
+
+      {editing !== null && (
+        <DriverLicenseForm
+          license={editing === 'new' ? undefined : editing}
+          onCancel={() => setEditing(null)}
+          onSubmit={async (payload) => {
+            if (editing === 'new') {
+              await createDriverLicenseRequest(citizenId, payload)
+            } else {
+              await updateDriverLicenseRequest(editing.id, payload)
+            }
+            await reload()
+            setEditing(null)
+            onChanged()
+          }}
+        />
+      )}
+
+      {licenses === null ? (
+        !error && <p className="text-sm text-slate-400">Đang tải...</p>
+      ) : (
+        <DriverLicenseList
+          licenses={licenses}
+          emptyText="Công dân chưa có giấy phép lái xe."
+          renderActions={(l) => (
+            <>
+              <button
+                type="button"
+                onClick={() => setEditing(l)}
+                className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2 py-1 text-xs font-medium hover:border-blue-400 hover:text-blue-600"
+              >
+                <Pencil className="h-3 w-3" /> Sửa
+              </button>
+              <button
+                type="button"
+                disabled={deletingId === l.id}
+                onClick={() => handleDelete(l)}
+                className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2 py-1 text-xs font-medium text-red-600 hover:border-red-400 disabled:opacity-50"
+              >
+                <Trash2 className="h-3 w-3" /> Xoá
+              </button>
+            </>
+          )}
+        />
+      )}
+    </div>
+  )
+}
+
+function DriverLicenseForm({
+  license,
+  onCancel,
+  onSubmit,
+}: {
+  license?: DriverLicense
+  onCancel: () => void
+  onSubmit: (payload: DriverLicensePayload) => Promise<void>
+}) {
+  const [licenseNumber, setLicenseNumber] = useState(license?.licenseNumber ?? '')
+  const [licenseClass, setLicenseClass] = useState(license?.licenseClass ?? 'B')
+  const [issueDate, setIssueDate] = useState(license?.issueDate ?? '')
+  const [expiryDate, setExpiryDate] = useState(license?.expiryDate ?? '')
+  const [issuedBy, setIssuedBy] = useState(license?.issuedBy ?? '')
+  const [status, setStatus] = useState<DriverLicenseStatus>(license?.status ?? 'ACTIVE')
+  const [saving, setSaving] = useState(false)
+  const [formError, setFormError] = useState('')
+
+  const handleSubmit = async () => {
+    setFormError('')
+    if (!/^\d{12}$/.test(licenseNumber)) {
+      setFormError('Số GPLX phải gồm đúng 12 chữ số.')
+      return
+    }
+    if (!issueDate) {
+      setFormError('Vui lòng nhập ngày cấp.')
+      return
+    }
+    if (expiryDate && expiryDate <= issueDate) {
+      setFormError('Ngày hết hạn phải sau ngày cấp.')
+      return
+    }
+
+    setSaving(true)
+    try {
+      await onSubmit({ licenseNumber, licenseClass, issueDate, expiryDate, issuedBy: issuedBy.trim(), status })
+    } catch (err) {
+      setFormError(err instanceof Error ? err.message : 'Không lưu được giấy phép lái xe.')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    // Không dùng <form> vì đang nằm trong Modal; Enter trong ô nhập sẽ lưu
+    <div
+      className="mb-3 space-y-2 rounded-xl border border-blue-200 bg-blue-50/40 p-3"
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' && (e.target as HTMLElement).tagName === 'INPUT') {
+          e.preventDefault()
+          handleSubmit()
+        }
+      }}
+    >
+      <p className="text-xs font-semibold text-blue-700">{license ? 'Sửa GPLX' : 'Thêm GPLX mới'}</p>
+      <div className="grid grid-cols-2 gap-2">
+        <Field label="Số GPLX * (12 chữ số)">
+          <input
+            className={inputClass}
+            maxLength={12}
+            value={licenseNumber}
+            onChange={(e) => setLicenseNumber(e.target.value.replace(/\D/g, ''))}
+            placeholder="79xxxxxxxxxx"
+          />
+        </Field>
+        <Field label="Hạng *">
+          <select className={inputClass} value={licenseClass} onChange={(e) => setLicenseClass(e.target.value)}>
+            <optgroup label="Hạng mới (từ 01/01/2025)">
+              {DRIVER_LICENSE_CLASSES.current.map((c) => (
+                <option key={c} value={c}>{c}</option>
+              ))}
+            </optgroup>
+            <optgroup label="Hạng cũ (cấp trước 2025)">
+              {DRIVER_LICENSE_CLASSES.legacy.map((c) => (
+                <option key={c} value={c}>{c}</option>
+              ))}
+            </optgroup>
+          </select>
+        </Field>
+      </div>
+      <div className="grid grid-cols-2 gap-2">
+        <Field label="Ngày cấp *">
+          <input type="date" className={inputClass} value={issueDate} onChange={(e) => setIssueDate(e.target.value)} />
+        </Field>
+        <Field label="Có giá trị đến (để trống nếu không thời hạn)">
+          <input type="date" className={inputClass} value={expiryDate} onChange={(e) => setExpiryDate(e.target.value)} />
+        </Field>
+      </div>
+      <div className="grid grid-cols-2 gap-2">
+        <Field label="Nơi cấp">
+          <input
+            className={inputClass}
+            value={issuedBy}
+            onChange={(e) => setIssuedBy(e.target.value)}
+            placeholder="Sở GTVT TP. Hồ Chí Minh"
+          />
+        </Field>
+        <Field label="Trạng thái">
+          <select
+            className={inputClass}
+            value={status}
+            onChange={(e) => setStatus(e.target.value as DriverLicenseStatus)}
+          >
+            {(Object.keys(DRIVER_LICENSE_STATUS_LABEL) as DriverLicenseStatus[]).map((s) => (
+              <option key={s} value={s}>{DRIVER_LICENSE_STATUS_LABEL[s]}</option>
+            ))}
+          </select>
+        </Field>
+      </div>
+
+      {formError && <p className="text-sm text-red-600">{formError}</p>}
+
+      <div className="flex justify-end gap-2">
+        <button
+          type="button"
+          onClick={onCancel}
+          className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50"
+        >
+          Hủy
+        </button>
+        <button
+          type="button"
+          disabled={saving}
+          onClick={handleSubmit}
+          className="inline-flex items-center gap-1.5 rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-blue-700 disabled:opacity-60"
+        >
+          {saving && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+          {license ? 'Lưu thay đổi' : 'Thêm GPLX'}
+        </button>
+      </div>
+    </div>
+  )
+}
+
+const FAILURE_REASON_LABEL: Record<string, string> = {
+  WRONG_PASSWORD: 'Sai mật khẩu',
+  ACCOUNT_LOCKED: 'Tài khoản bị khóa',
+}
+
+function LoginHistorySection({ citizenId }: { citizenId: string }) {
+  const [history, setHistory] = useState<LoginHistoryEntry[] | null>(null)
+  const [error, setError] = useState('')
+
+  useEffect(() => {
+    let cancelled = false
+    getCitizenLoginHistoryRequest(citizenId)
+      .then((res) => {
+        if (!cancelled) setHistory(res.history ?? [])
+      })
+      .catch((err) => {
+        if (!cancelled) setError(err instanceof Error ? err.message : 'Không tải được lịch sử đăng nhập.')
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [citizenId])
+
+  return (
+    <div className="mt-4">
+      <p className="mb-2 text-sm font-semibold text-slate-700">Lịch sử đăng nhập</p>
+      {error ? (
+        <p className="text-sm text-red-600">{error}</p>
+      ) : history === null ? (
+        <p className="text-sm text-slate-400">Đang tải...</p>
+      ) : history.length === 0 ? (
+        <p className="text-sm text-slate-400">Công dân chưa từng đăng nhập vào hệ thống.</p>
+      ) : (
+        <ul className="max-h-60 space-y-1 overflow-y-auto">
+          {history.map((h) => (
+            <li
+              key={h.id}
+              className="flex items-start justify-between gap-3 rounded-lg bg-slate-50 px-3 py-2 text-sm"
+            >
+              <div className="min-w-0">
+                <p className="font-medium text-slate-900">
+                  {h.loggedInAt ? formatDateTime(h.loggedInAt) : '—'}
+                </p>
+                <p className="truncate text-xs text-slate-400">
+                  {h.ipAddress || 'Không rõ IP'}
+                  {h.loggedOutAt && ` · Đăng xuất lúc ${formatDateTime(h.loggedOutAt)}`}
+                </p>
+              </div>
+              {h.status === 'FAILED' ? (
+                <span className="shrink-0 rounded-full bg-red-50 px-2 py-0.5 text-xs font-medium text-red-600">
+                  Thất bại{h.failureReason ? ` · ${FAILURE_REASON_LABEL[h.failureReason] ?? h.failureReason}` : ''}
+                </span>
+              ) : h.isActive ? (
+                <span className="shrink-0 rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-700">
+                  Đang hoạt động
+                </span>
+              ) : (
+                <span className="shrink-0 rounded-full bg-blue-50 px-2 py-0.5 text-xs font-medium text-blue-700">
+                  Thành công
+                </span>
+              )}
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
   )
 }
 

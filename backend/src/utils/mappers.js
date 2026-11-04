@@ -11,7 +11,9 @@ function toDateOnly(value) {
   }
   const date = value instanceof Date ? value : new Date(value);
   if (Number.isNaN(date.getTime())) return null;
-  return date.toISOString().slice(0, 10);
+  // mysql2 trả cột DATE là 00:00 giờ địa phương → lấy ngày theo giờ địa phương, không dùng toISOString (UTC) để tránh lùi 1 ngày
+  const pad = (n) => String(n).padStart(2, '0');
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
 }
 
 function resolveInvoiceStatus(row) {
@@ -82,8 +84,30 @@ function mapCamera(row) {
     longitude: toNumber(row.longitude),
     hlsStreamUrl: row.hls_stream_url ?? null,
     videoUrl: row.video_url ?? null,
+    stopLine: parseJsonColumn(row.stop_line),
+    signalConfig: parseJsonColumn(row.signal_config),
+    monitoring: Boolean(row.monitoring),
     status: row.status,
   };
+}
+
+function mapCameraEvent(row) {
+  return {
+    id: row.id,
+    cameraId: row.camera_id,
+    videoTimestamp: Number(row.video_timestamp),
+    plate: row.detected_plate_text ?? null,
+    signalState: row.signal_state ?? null,
+    vehicleClass: row.vehicle_class ?? null,
+    snapshotUrl: row.snapshot_url ?? null,
+    violationId: row.promoted_violation_id ?? null,
+    createdAt: toIso(row.created_at),
+  };
+}
+
+function parseJsonColumn(value) {
+  if (value === null || value === undefined) return null;
+  return typeof value === 'string' ? JSON.parse(value) : value;
 }
 
 function toNumber(value) {
@@ -104,6 +128,7 @@ function mapViolation(row) {
     ocrConfidence: toNumber(row.ocr_confidence) ?? 0,
     violationType: row.violation_type,
     evidenceImageUrl: row.evidence_image_url,
+    plateImageUrl: row.plate_image_url ?? null,
     evidenceVideoUrl: row.evidence_video_url ?? null,
     detectedAt: toIso(row.detected_at),
     dueDate: toIso(row.due_date),
@@ -154,10 +179,37 @@ function mapInvoice(row) {
   };
 }
 
+// Bằng đang ACTIVE nhưng đã quá ngày hết hạn thì trả về EXPIRED
+function resolveDriverLicenseStatus(row) {
+  const expiry = toDateOnly(row.expiry_date);
+  if (row.status === 'ACTIVE' && expiry && expiry < toDateOnly(new Date())) {
+    return 'EXPIRED';
+  }
+  return row.status;
+}
+
+function mapDriverLicense(row) {
+  return {
+    id: row.id,
+    userId: row.user_id,
+    licenseNumber: row.license_number,
+    licenseClass: row.license_class,
+    issueDate: toDateOnly(row.issue_date),
+    expiryDate: toDateOnly(row.expiry_date),
+    issuedBy: row.issued_by ?? null,
+    status: resolveDriverLicenseStatus(row),
+    createdAt: toIso(row.created_at),
+    updatedAt: toIso(row.updated_at),
+  };
+}
+
 module.exports = {
   mapVehicle,
   mapOwner,
   mapCamera,
+  mapCameraEvent,
   mapViolation,
   mapInvoice,
+  mapDriverLicense,
+  toDateOnly,
 };

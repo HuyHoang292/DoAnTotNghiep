@@ -11,10 +11,20 @@ router.get('/plates', officerController.lookupPlate);
 router.post('/scan-plate', officerController.scanPlate);
 router.post('/plate-images', officerController.uploadPlateImage);
 router.patch('/cameras/:id/video', officerController.updateCameraVideo);
+router.patch('/cameras/:id/red-light-config', officerController.updateCameraRedLightConfig);
+router.post('/cameras/:id/monitoring', officerController.startCameraMonitoring);
+router.delete('/cameras/:id/monitoring', officerController.stopCameraMonitoring);
+router.get('/cameras/:id/monitoring', officerController.getCameraMonitoring);
+router.get('/cameras/:id/live-frame', officerController.getCameraLiveFrame);
 
 router.get('/citizens', officerController.listCitizens);
 router.post('/citizens', officerController.createCitizen);
+router.get('/citizens/:id/login-history', officerController.getCitizenLoginHistory);
 router.patch('/citizens/:id', officerController.updateCitizen);
+router.get('/citizens/:id/driver-licenses', officerController.listCitizenDriverLicenses);
+router.post('/citizens/:id/driver-licenses', officerController.createDriverLicense);
+router.patch('/driver-licenses/:id', officerController.updateDriverLicense);
+router.delete('/driver-licenses/:id', officerController.deleteDriverLicense);
 
 router.get('/vehicles', officerController.listVehicles);
 router.post('/vehicles', officerController.createVehicle);

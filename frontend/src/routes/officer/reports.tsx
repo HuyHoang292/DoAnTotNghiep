@@ -73,19 +73,16 @@ function OfficerReports() {
   }, [])
 
   const from = useMemo(() => (range === 'all' ? 0 : Date.now() - Number(range) * DAY), [range])
-
   const vList = useMemo(() => violations.filter((v) => +new Date(v.detectedAt) >= from), [violations, from])
   const iList = useMemo(
     () => invoices.filter((i) => i.status !== 'CANCELLED' && +new Date(i.issueDate ?? 0) >= from),
     [invoices, from],
   )
-
   const paid = iList.filter((i) => i.status === 'PAID')
   const unpaid = iList.filter((i) => i.status === 'UNPAID' || i.status === 'OVERDUE')
   const revenue = paid.reduce((s, i) => s + i.amount, 0)
   const outstanding = unpaid.reduce((s, i) => s + i.amount, 0)
   const rejected = vList.filter((v) => v.status === 'REJECTED').length
-
   // Độ chính xác AI: trong các hồ sơ AI đã được cán bộ xem xét, bao nhiêu % được xác nhận
   const aiReviewed = vList.filter((v) => (v.source ?? 'AI') === 'AI' && v.status !== 'AI_PENDING')
   const aiConfirmed = aiReviewed.filter((v) => v.status !== 'REJECTED').length
@@ -109,7 +106,6 @@ function OfficerReports() {
         ...v,
       }))
   }, [vList, paid])
-
   const byType = useMemo(
     () =>
       (Object.keys(VIOLATION_TYPE_LABEL) as ViolationType[]).map((t) => {
@@ -122,7 +118,6 @@ function OfficerReports() {
       }),
     [vList, iList],
   )
-
   const byLocation = useMemo(
     () =>
       cameras
@@ -135,7 +130,6 @@ function OfficerReports() {
         .slice(0, 8),
     [cameras, vList],
   )
-
   const exportCsv = () => {
     const rows: string[][] = [
       ['Chỉ tiêu', 'Giá trị'],
@@ -159,12 +153,9 @@ function OfficerReports() {
     a.click()
     URL.revokeObjectURL(url)
   }
-
   if (loading) return <p className="text-sm text-slate-500">Đang tải dữ liệu báo cáo...</p>
   if (error) return <EmptyState title="Không tải được dữ liệu" description={error} />
-
   const pieData = byType.filter((t) => t.value > 0)
-
   return (
     <>
       <PageHeader
@@ -180,7 +171,6 @@ function OfficerReports() {
           </button>
         }
       />
-
       <div className="flex flex-wrap gap-2">
         {RANGES.map((r) => (
           <button
@@ -197,7 +187,6 @@ function OfficerReports() {
           </button>
         ))}
       </div>
-
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <StatCard
           label="Vi phạm ghi nhận"
@@ -228,7 +217,6 @@ function OfficerReports() {
           tone="pending"
         />
       </div>
-
       <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
         <h2 className="font-semibold text-slate-900">Diễn biến vi phạm và thu phạt</h2>
         {byDay.length === 0 ? (
@@ -249,7 +237,6 @@ function OfficerReports() {
           </div>
         )}
       </section>
-
       <div className="grid gap-4 xl:grid-cols-2">
         <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
           <h2 className="font-semibold text-slate-900">Cơ cấu loại vi phạm</h2>
@@ -271,7 +258,6 @@ function OfficerReports() {
             </div>
           )}
         </section>
-
         <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
           <h2 className="font-semibold text-slate-900">Địa điểm nhiều vi phạm</h2>
           {byLocation.length === 0 ? (
@@ -291,7 +277,6 @@ function OfficerReports() {
           )}
         </section>
       </div>
-
       <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
         <h2 className="p-4 font-semibold text-slate-900">Bảng tổng hợp theo loại vi phạm</h2>
         <div className="overflow-x-auto border-t border-slate-100">

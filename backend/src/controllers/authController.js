@@ -4,6 +4,30 @@ const jwt = require('jsonwebtoken');
 
 const JWT_SECRET = process.env.JWT_SECRET || 'super_secret_key_traffic_app';
 
+function getClientIp(req) {
+  const forwarded = req.headers['x-forwarded-for'];
+  const ip = (typeof forwarded === 'string' && forwarded.split(',')[0].trim()) || req.ip || '';
+  return ip.replace(/^::ffff:/, '').slice(0, 45) || null;
+}
+
+// Ghi lịch sử đăng nhập; lỗi ghi log không được làm hỏng việc đăng nhập
+async function recordLogin(req, userId, status, failureReason = null) {
+  try {
+    const [id] = await db('login_history').insert({
+      user_id: userId,
+      status,
+      failure_reason: failureReason,
+      ip_address: getClientIp(req),
+      user_agent: String(req.headers['user-agent'] || '').slice(0, 255) || null,
+      logged_in_at: new Date(),
+    });
+    return id;
+  } catch (error) {
+    console.error('Record login history error:', error);
+    return null;
+  }
+}
+
 exports.login = async (req, res) => {
   try {
     const { username, password } = req.body;
@@ -27,15 +51,19 @@ exports.login = async (req, res) => {
     const isMatch = await bcrypt.compare(password, user.password_hash);
 
     if (!isMatch) {
+      await recordLogin(req, user.id, 'FAILED', 'WRONG_PASSWORD');
       return res.status(401).json({ message: 'Tên đăng nhập hoặc mật khẩu không đúng.' });
     }
 
     if (user.status !== 'ACTIVE') {
+      await recordLogin(req, user.id, 'FAILED', 'ACCOUNT_LOCKED');
       return res.status(403).json({ message: 'Tài khoản đã bị khóa.' });
     }
 
+    const sessionId = await recordLogin(req, user.id, 'SUCCESS');
+
     const token = jwt.sign(
-      { id: user.id, role: user.role, fullName: user.full_name },
+      { id: user.id, role: user.role, fullName: user.full_name, sid: sessionId },
       JWT_SECRET,
       { expiresIn: '1d' }
     );
@@ -126,6 +154,21 @@ exports.changePassword = async (req, res) => {
     return res.json({ message: 'Đổi mật khẩu thành công.' });
   } catch (error) {
     console.error('ChangePassword Error:', error);
+    return res.status(500).json({ message: 'Lỗi máy chủ nội bộ.' });
+  }
+};
+
+exports.logout = async (req, res) => {
+  try {
+    if (req.user?.sid) {
+      await db('login_history')
+        .where({ id: req.user.sid, user_id: req.user.id })
+        .whereNull('logged_out_at')
+        .update({ logged_out_at: new Date() });
+    }
+    return res.json({ message: 'Đăng xuất thành công.' });
+  } catch (error) {
+    console.error('Logout Error:', error);
     return res.status(500).json({ message: 'Lỗi máy chủ nội bộ.' });
   }
 };
