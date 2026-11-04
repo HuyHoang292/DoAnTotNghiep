@@ -13,33 +13,45 @@ const bcrypt = require('bcryptjs');
 
 // Ảnh biển số của phương tiện
 const VEHICLE_IMAGES = {
-  'veh-dan-01': 'https://res.cloudinary.com/swmrzf85/image/upload/v1793174359/doantotnghiep/vehicles/xgcxpjrwjqddf3qzc8l6.jpg', // 51A-853.25
-  'veh-dan-02': 'https://res.cloudinary.com/swmrzf85/image/upload/v1793174568/doantotnghiep/violations/cqjxeprgo5gsqv5ukslr.jpg', // 51F-069.48
+  'veh-dan-01': 'https://res.cloudinary.com/swmrzf85/image/upload/v1793611176/doantotnghiep/camera-events/f0ecf4ee-bf01-406b-b2bb-82e6edc28b03-closeup.jpg', // 75G1-076.82
+  'veh-dan-02': 'https://res.cloudinary.com/swmrzf85/image/upload/v1793611146/doantotnghiep/camera-events/06db19b8-4714-4ac3-8767-82fa326e867c-closeup.jpg', // 75G1-472.47
   'veh-mai-01': 'https://res.cloudinary.com/swmrzf85/image/upload/v1793174758/doantotnghiep/vehicles/go3sbsvujobtkokiktdm.jpg', // 51A-602.16
   'veh-hung-01': 'https://res.cloudinary.com/swmrzf85/image/upload/v1793174771/doantotnghiep/vehicles/y2d2cnolhdoctmncjomy.jpg', // 51A-720.78
 };
 
 // Ảnh bằng chứng của vi phạm
 const VIOLATION_IMAGES = {
-  'vio-pending-01': 'https://res.cloudinary.com/swmrzf85/image/upload/v1793174359/doantotnghiep/vehicles/xgcxpjrwjqddf3qzc8l6.jpg', // 51A-853.25
+  'vio-pending-01': 'https://res.cloudinary.com/swmrzf85/image/upload/v1793609320/doantotnghiep/camera-events/f0ecf4ee-bf01-406b-b2bb-82e6edc28b03.jpg', // 75G1-076.82
   'vio-pending-02': 'https://res.cloudinary.com/swmrzf85/image/upload/v1793174758/doantotnghiep/vehicles/go3sbsvujobtkokiktdm.jpg', // 51A-602.16
   'vio-pending-03': 'https://res.cloudinary.com/swmrzf85/image/upload/v1793174771/doantotnghiep/vehicles/y2d2cnolhdoctmncjomy.jpg', // 51A-720.78
-  'vio-pending-04': 'https://res.cloudinary.com/swmrzf85/image/upload/v1793174568/doantotnghiep/violations/cqjxeprgo5gsqv5ukslr.jpg', // 51F-069.48
-  'vio-verified-01': 'https://res.cloudinary.com/swmrzf85/image/upload/v1793174359/doantotnghiep/vehicles/xgcxpjrwjqddf3qzc8l6.jpg', // 51A-853.25
+  'vio-pending-04': 'https://res.cloudinary.com/swmrzf85/image/upload/v1793609444/doantotnghiep/camera-events/06db19b8-4714-4ac3-8767-82fa326e867c.jpg', // 75G1-472.47
+  'vio-verified-01': 'https://res.cloudinary.com/swmrzf85/image/upload/v1793609320/doantotnghiep/camera-events/f0ecf4ee-bf01-406b-b2bb-82e6edc28b03.jpg', // 75G1-076.82
   'vio-verified-02': 'https://res.cloudinary.com/swmrzf85/image/upload/v1793174758/doantotnghiep/vehicles/go3sbsvujobtkokiktdm.jpg', // 51A-602.16
   'vio-rejected-01': 'https://res.cloudinary.com/swmrzf85/image/upload/v1793175871/biensovn_2279_jpg.rf.fe3db0e739e55850c6a1beb76da38fdf.jpg', // ảnh mờ, không đọc được biển
-  'vio-dan-1a': 'https://res.cloudinary.com/swmrzf85/image/upload/v1793174359/doantotnghiep/vehicles/xgcxpjrwjqddf3qzc8l6.jpg', // 51A-853.25
-  'vio-dan-1b': 'https://res.cloudinary.com/swmrzf85/image/upload/v1793174359/doantotnghiep/vehicles/xgcxpjrwjqddf3qzc8l6.jpg', // 51A-853.25
-  'vio-dan-2a': 'https://res.cloudinary.com/swmrzf85/image/upload/v1793174568/doantotnghiep/violations/cqjxeprgo5gsqv5ukslr.jpg', // 51F-069.48
+  'vio-dan-1a': 'https://res.cloudinary.com/swmrzf85/image/upload/v1793609320/doantotnghiep/camera-events/f0ecf4ee-bf01-406b-b2bb-82e6edc28b03.jpg', // 75G1-076.82
+  'vio-dan-1b': 'https://res.cloudinary.com/swmrzf85/image/upload/v1793609320/doantotnghiep/camera-events/f0ecf4ee-bf01-406b-b2bb-82e6edc28b03.jpg', // 75G1-076.82
+  'vio-dan-2a': 'https://res.cloudinary.com/swmrzf85/image/upload/v1793609444/doantotnghiep/camera-events/06db19b8-4714-4ac3-8767-82fa326e867c.jpg', // 75G1-472.47
   'vio-mai-1a': 'https://res.cloudinary.com/swmrzf85/image/upload/v1793174758/doantotnghiep/vehicles/go3sbsvujobtkokiktdm.jpg', // 51A-602.16
   'vio-hung-1a': 'https://res.cloudinary.com/swmrzf85/image/upload/v1793174771/doantotnghiep/vehicles/y2d2cnolhdoctmncjomy.jpg', // 51A-720.78
-  'vio-officer-01': 'https://res.cloudinary.com/swmrzf85/image/upload/v1793174359/doantotnghiep/vehicles/xgcxpjrwjqddf3qzc8l6.jpg', // 51A-853.25
+  'vio-officer-01': 'https://res.cloudinary.com/swmrzf85/image/upload/v1793609320/doantotnghiep/camera-events/f0ecf4ee-bf01-406b-b2bb-82e6edc28b03.jpg', // 75G1-076.82
 };
 
 // Video mẫu của camera (Cloudinary …/video/upload/…), để trống nếu chưa có
 const CAMERA_VIDEOS = {
-  'cam-001': 'https://res.cloudinary.com/swmrzf85/video/upload/v1793185017/2026-10-28_17-54-28.mp4',
-  'cam-002': 'https://res.cloudinary.com/swmrzf85/video/upload/q_auto,w_854,fps_30/v1793185017/2026-10-28_17-54-28.mp4',
+  'cam-001': 'https://res.cloudinary.com/swmrzf85/video/upload/v1793343082/Traffic.mp4',
+  'cam-002': 'https://res.cloudinary.com/swmrzf85/video/upload/v1793343080/Traffic1.mp4',
+};
+
+// Vạch dừng và vùng đèn đo theo khung hình của từng video mẫu
+const CAMERA_RED_LIGHT_CONFIG = {
+  'cam-001': {
+    stop_line: { x1: 0, y1: 0.833, x2: 0.81, y2: 0.833, travelSide: -1 },
+    signal_config: { mode: 'VISION', roi: { x1: 0.972, y1: 0.262, x2: 1, y2: 0.378 } },
+  },
+  'cam-002': {
+    stop_line: { x1: 0.12, y1: 0.593, x2: 0.778, y2: 0.593, travelSide: -1 },
+    signal_config: { mode: 'VISION', roi: { x1: 0.962, y1: 0.012, x2: 0.992, y2: 0.128 } },
+  },
 };
 
 // ════════════════════════════════════════════════════════════════════════════
@@ -204,10 +216,19 @@ const CAMERAS = [
 ];
 
 const VEHICLES = [
-  { id: 'veh-dan-01', license_plate: '51A-853.25', owner_id: 'usr-dan-001', vehicle_type: 'CAR', brand: 'Toyota', model: 'Camry', color: 'Đen', registered_at: '2023-01-15' },
-  { id: 'veh-dan-02', license_plate: '51F-069.48', owner_id: 'usr-dan-001', vehicle_type: 'MOTORBIKE', brand: 'Honda', model: 'SH 150i', color: 'Trắng', registered_at: '2023-05-20' },
+  { id: 'veh-dan-01', license_plate: '75G1-076.82', owner_id: 'usr-dan-001', vehicle_type: 'CAR', brand: 'Toyota', model: 'Camry', color: 'Đen', registered_at: '2023-01-15' },
+  { id: 'veh-dan-02', license_plate: '75G1-472.47', owner_id: 'usr-dan-001', vehicle_type: 'MOTORBIKE', brand: 'Honda', model: 'SH 150i', color: 'Trắng', registered_at: '2023-05-20' },
   { id: 'veh-mai-01', license_plate: '51A-602.16', owner_id: 'usr-mai-002', vehicle_type: 'CAR', brand: 'Mazda', model: 'CX-5', color: 'Trắng', registered_at: '2023-11-11' },
   { id: 'veh-hung-01', license_plate: '51A-720.78', owner_id: 'usr-hung-003', vehicle_type: 'CAR', brand: 'Kia', model: 'K3', color: 'Xám', registered_at: '2023-09-09' },
+];
+
+// Giấy phép lái xe. expiry_date = null: bằng không thời hạn (hạng mô tô)
+const DRIVER_LICENSES = [
+  { id: 'gplx-dan-a1', user_id: 'usr-dan-001', license_number: '790123456789', license_class: 'A1', issue_date: '2014-03-10', expiry_date: null, issued_by: 'Sở GTVT TP. Hồ Chí Minh' },
+  { id: 'gplx-dan-b2', user_id: 'usr-dan-001', license_number: '790198765432', license_class: 'B2', issue_date: '2018-07-02', expiry_date: '2028-07-02', issued_by: 'Sở GTVT TP. Hồ Chí Minh' },
+  { id: 'gplx-mai-b', user_id: 'usr-mai-002', license_number: '790234567890', license_class: 'B', issue_date: '2025-04-15', expiry_date: '2035-04-15', issued_by: 'Cục CSGT - Bộ Công an' },
+  { id: 'gplx-hung-b2', user_id: 'usr-hung-003', license_number: '790345678901', license_class: 'B2', issue_date: '2012-09-20', expiry_date: '2022-09-20', issued_by: 'Sở GTVT TP. Hồ Chí Minh' },
+  { id: 'gplx-hung-a1', user_id: 'usr-hung-003', license_number: '790345678902', license_class: 'A1', issue_date: '2010-05-05', expiry_date: null, issued_by: 'Sở GTVT TP. Hồ Chí Minh', status: 'SUSPENDED' },
 ];
 
 /**
@@ -301,6 +322,7 @@ exports.seed = async function (knex) {
   // 1. Dọn dữ liệu cũ (tắt khóa ngoại để truncate được)
   await knex.raw('SET FOREIGN_KEY_CHECKS = 0');
   for (const table of [
+    'login_history',
     'audit_logs',
     'notifications',
     'invoices',
@@ -310,6 +332,7 @@ exports.seed = async function (knex) {
     'fines',
     'vehicle_verification_history',
     'vehicles',
+    'driver_licenses',
     'users',
   ]) {
     await knex(table).truncate();
@@ -318,7 +341,12 @@ exports.seed = async function (knex) {
 
   // 2. Danh mục
   await knex('fines').insert(FINES);
-  await knex('cameras').insert(CAMERAS.map((c) => ({ ...c, video_url: CAMERA_VIDEOS[c.id] || null })));
+  await knex('cameras').insert(CAMERAS.map((c) => ({
+    ...c,
+    video_url: CAMERA_VIDEOS[c.id] || null,
+    stop_line: CAMERA_RED_LIGHT_CONFIG[c.id] ? JSON.stringify(CAMERA_RED_LIGHT_CONFIG[c.id].stop_line) : null,
+    signal_config: CAMERA_RED_LIGHT_CONFIG[c.id] ? JSON.stringify(CAMERA_RED_LIGHT_CONFIG[c.id].signal_config) : null,
+  })));
 
   // 3. Người dùng
   const password_hash = await bcrypt.hash('123456', 10);
@@ -334,7 +362,12 @@ exports.seed = async function (knex) {
     })),
   ]);
 
-  // 4. Phương tiện
+  // 4. Giấy phép lái xe
+  await knex('driver_licenses').insert(
+    DRIVER_LICENSES.map((l) => ({ status: 'ACTIVE', ...l })),
+  );
+
+  // 5. Phương tiện
   await knex('vehicles').insert(
     VEHICLES.map((v) => ({
       ...v,
@@ -343,7 +376,7 @@ exports.seed = async function (knex) {
     })),
   );
 
-  // 5. Vi phạm & hóa đơn
+  // 6. Vi phạm & hóa đơn
   const { violations, invoices } = buildViolationRows();
   await knex('violations').insert(violations);
   await knex('invoices').insert(invoices);

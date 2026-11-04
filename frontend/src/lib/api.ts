@@ -1,4 +1,16 @@
-import type { Camera, Invoice, Vehicle, VehicleOwner, Violation } from './types'
+import type {
+  Camera,
+  CameraEvent,
+  DriverLicense,
+  MonitoringStatus,
+  SignalConfig,
+  StopLine,
+  Invoice,
+  LoginHistoryEntry,
+  Vehicle,
+  VehicleOwner,
+  Violation,
+} from './types'
 
 // Khi có VITE_API_URL (production/docker) thì dùng URL tuyệt đối.
 // Khi dev (localhost), để trống → dùng path tương đối → đi qua Vite proxy → tránh CORS.
@@ -77,6 +89,10 @@ export async function loginRequest(username: string, password: string) {
     method: 'POST',
     body: JSON.stringify({ username, password }),
   })
+}
+
+export async function logoutRequest() {
+  return apiFetch<{ message: string }>('/api/auth/logout', { method: 'POST' })
 }
 
 export async function getMeRequest() {
@@ -185,6 +201,10 @@ export async function listCitizensRequest() {
   return apiFetch<{ users: VehicleOwner[] }>('/api/officer/citizens')
 }
 
+export async function getCitizenLoginHistoryRequest(id: string) {
+  return apiFetch<{ history: LoginHistoryEntry[] }>(`/api/officer/citizens/${id}/login-history`)
+}
+
 export async function createCitizenRequest(payload: {
   fullName: string
   nationalId: string
@@ -222,6 +242,43 @@ export async function updateCitizenRequest(
     method: 'PATCH',
     body: JSON.stringify(payload),
   })
+}
+
+// ============ DRIVER LICENSES API ============
+
+export type DriverLicensePayload = {
+  licenseNumber: string
+  licenseClass: string
+  issueDate: string
+  expiryDate?: string
+  issuedBy?: string
+  status?: string
+}
+
+export async function getMyDriverLicensesRequest() {
+  return apiFetch<{ licenses: DriverLicense[] }>('/api/citizen/driver-licenses')
+}
+
+export async function listCitizenDriverLicensesRequest(citizenId: string) {
+  return apiFetch<{ licenses: DriverLicense[] }>(`/api/officer/citizens/${citizenId}/driver-licenses`)
+}
+
+export async function createDriverLicenseRequest(citizenId: string, payload: DriverLicensePayload) {
+  return apiFetch<{ license: DriverLicense }>(`/api/officer/citizens/${citizenId}/driver-licenses`, {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  })
+}
+
+export async function updateDriverLicenseRequest(id: string, payload: Partial<DriverLicensePayload>) {
+  return apiFetch<{ license: DriverLicense }>(`/api/officer/driver-licenses/${id}`, {
+    method: 'PATCH',
+    body: JSON.stringify(payload),
+  })
+}
+
+export async function deleteDriverLicenseRequest(id: string) {
+  return apiFetch<{ message: string }>(`/api/officer/driver-licenses/${id}`, { method: 'DELETE' })
 }
 
 export async function listVehiclesRequest() {
@@ -404,6 +461,33 @@ export async function updateCameraVideoRequest(id: string, videoUrl: string) {
     method: 'PATCH',
     body: JSON.stringify({ videoUrl }),
   })
+}
+
+export async function updateCameraRedLightConfigRequest(id: string, stopLine: StopLine, signalConfig: SignalConfig) {
+  return apiFetch<{ camera: Camera }>(`/api/officer/cameras/${id}/red-light-config`, {
+    method: 'PATCH',
+    body: JSON.stringify({ stopLine, signalConfig }),
+  })
+}
+
+export async function startCameraMonitoringRequest(id: string) {
+  return apiFetch<{ camera: Camera }>(`/api/officer/cameras/${id}/monitoring`, { method: 'POST' })
+}
+
+export async function stopCameraMonitoringRequest(id: string) {
+  return apiFetch<{ camera: Camera }>(`/api/officer/cameras/${id}/monitoring`, { method: 'DELETE' })
+}
+
+export async function getCameraMonitoringRequest(id: string) {
+  return apiFetch<{ status: MonitoringStatus; events: CameraEvent[] }>(`/api/officer/cameras/${id}/monitoring`)
+}
+
+/** Khung hình giám sát mới nhất; null khi AI chưa có hình */
+export async function fetchCameraLiveFrame(id: string): Promise<Blob | null> {
+  const response = await fetch(`${API_BASE_URL}/api/officer/cameras/${id}/live-frame`, {
+    headers: { Authorization: `Bearer ${getToken() ?? ''}` },
+  })
+  return response.status === 200 ? response.blob() : null
 }
 
 export async function cancelInvoiceRequest(id: string, reason: string) {

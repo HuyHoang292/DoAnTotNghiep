@@ -12,6 +12,7 @@ import {
   clearToken,
   getMeRequest,
   getToken,
+  logoutRequest,
 } from './api'
 
 type AuthContextValue = {
@@ -57,6 +58,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [reload])
 
   const logout = useCallback(() => {
+    // Báo server đóng phiên trong lịch sử đăng nhập (không chờ, lỗi thì bỏ qua)
+    if (getToken()) logoutRequest().catch(() => {})
     clearToken()
     setUser(null)
   }, [])

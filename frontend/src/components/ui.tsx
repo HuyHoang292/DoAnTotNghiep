@@ -172,3 +172,16 @@ export function ViolationStatusBadge({ status }: { status: string }) {
     </span>
   )
 }
+
+/** Ảnh cận biển số của vi phạm do AI ghi nhận, giúp người xem đối chiếu mà không cần phóng to ảnh toàn cảnh */
+export function PlateCloseup({ src, className = '' }: { src?: string | null; className?: string }) {
+  if (!src) return null
+  return (
+    <figure className={`overflow-hidden rounded-xl border border-slate-200 bg-slate-900 ${className}`}>
+      <a href={src} target="_blank" rel="noreferrer" title="Mở ảnh gốc">
+        <img src={src} alt="Ảnh cận biển số" className="mx-auto max-h-56 w-full object-contain" />
+      </a>
+      <figcaption className="bg-white px-3 py-1.5 text-xs font-medium text-slate-600">Ảnh cận biển số</figcaption>
+    </figure>
+  )
+}

@@ -5,6 +5,7 @@ import { getCitizenDashboard } from '@/lib/api'
 import {
   EmptyState,
   PageHeader,
+  PlateCloseup,
   PlateTag,
   ViolationStatusBadge,
   Modal,
@@ -117,6 +118,7 @@ function ViolationDetail() {
         {/* Cột trái */}
         <div className="space-y-4 lg:col-span-2">
           {/* Ảnh chứng cứ */}
+          <PlateCloseup src={violation.plateImageUrl} className="shadow-sm" />
           <figure className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
             <img
               src={violation.evidenceImageUrl}

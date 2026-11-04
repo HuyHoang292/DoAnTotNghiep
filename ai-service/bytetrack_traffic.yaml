@@ -1,0 +1,9 @@
+# ByteTrack nới ngưỡng cho camera giao thông: xe máy nhìn từ phía sau có độ tin cậy thấp,
+# ngưỡng mặc định làm track bị đứt và đổi ID ngay đoạn xe qua vạch.
+tracker_type: bytetrack
+track_high_thresh: 0.2
+track_low_thresh: 0.05
+new_track_thresh: 0.2
+track_buffer: 60
+match_thresh: 0.9
+fuse_score: True
