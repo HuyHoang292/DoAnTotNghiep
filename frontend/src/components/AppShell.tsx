@@ -20,6 +20,7 @@ import { useEffect, useState, type ReactNode } from 'react'
 import { useAuth } from '@/lib/auth'
 import { cn } from '@/lib/cn'
 import { ChangePasswordModal } from './ChangePasswordModal'
+import { NotificationBell } from './NotificationBell'
 
 type Role = 'CITIZEN' | 'OFFICER' | 'ADMIN'
 
@@ -184,9 +185,13 @@ export function AppShell({
             <span className="hidden rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-600 sm:inline">
               {isOfficer ? 'CÁN BỘ' : 'CÔNG DÂN'}
             </span>
-            <button type="button" className="relative rounded-lg p-2 text-slate-500 hover:bg-slate-100">
-              <Bell className="h-5 w-5" />
-            </button>
+            {isOfficer ? (
+              <button type="button" className="relative rounded-lg p-2 text-slate-500 hover:bg-slate-100">
+                <Bell className="h-5 w-5" />
+              </button>
+            ) : (
+              <NotificationBell />
+            )}
           </div>
         </header>
         <main className="space-y-5 p-4 md:p-6">{children ?? <Outlet />}</main>

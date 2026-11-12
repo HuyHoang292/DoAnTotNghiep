@@ -1,9 +1,8 @@
-const crypto = require('crypto');
 const bcrypt = require('bcryptjs');
 const nodemailer = require('nodemailer');
 const db = require('../../db/knex');
 const { mapOwner, mapDriverLicense } = require('../../utils/mappers');
-const { now, dupMessage, isDup, findCitizen } = require('./helpers');
+const { now, dupMessage, isDup, isDupPrimary, nextCitizenId, findCitizen } = require('./helpers');
 
 // Cấu hình dịch vụ gửi email tự động
 const transporter = nodemailer.createTransport({
@@ -147,11 +146,8 @@ exports.createCitizen = async (req, res) => {
     }
 
     const passwordHash = await bcrypt.hash(DEFAULT_CITIZEN_PASSWORD, 10);
-    const id = crypto.randomUUID();
-
     // Thực hiện insert đầy đủ các trường địa chỉ vào cơ sở dữ liệu
-    await db('users').insert({
-      id,
+    const citizenRow = {
       full_name: fullName,
       national_id: nationalId,
       email,
@@ -171,7 +167,19 @@ exports.createCitizen = async (req, res) => {
       created_by: req.user?.id || null,
       created_at: now(),
       updated_at: now(),
-    });
+    };
+
+    // Mã công dân dạng user-citizen-???; hai cán bộ tạo cùng lúc có thể trùng mã thì lấy mã kế tiếp
+    let id;
+    for (let attempt = 0; ; attempt += 1) {
+      id = await nextCitizenId();
+      try {
+        await db('users').insert({ id, ...citizenRow });
+        break;
+      } catch (error) {
+        if (!isDupPrimary(error) || attempt >= 4) throw error;
+      }
+    }
 
     // --- TỰ ĐỘNG GỬI EMAIL THÔNG BÁO TÀI KHOẢN ---
     const localLoginUrl = 'http://localhost:3000/login';

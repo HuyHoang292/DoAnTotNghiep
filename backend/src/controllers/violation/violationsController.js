@@ -2,6 +2,7 @@ const db = require('../../db/knex');
 const crypto = require('crypto');
 const { mapViolation } = require('../../utils/mappers');
 const { uploadImage, isDataUrlImage, isStoredImageUrl } = require('../../services/imageStorage');
+const { notifyViolationVerified } = require('../../services/notifications');
 const { now, VIOLATION_SELECT, violationsBaseQuery, applyViolationFilters, normalizePlate } = require('./helpers');
 
 // Lấy danh sách tất cả vi phạm với filter
@@ -71,7 +72,7 @@ exports.getViolationDetail = async (req, res) => {
         'v.violation_type',
         'v.evidence_image_url',
         'v.plate_image_url',
-  'v.plate_image_url',
+        'v.plate_box',
         'v.evidence_video_url',
         'v.detected_at',
         'v.due_date',
@@ -254,6 +255,8 @@ exports.createOfficerViolation = async (req, res) => {
       created_at: now(),
       updated_at: now(),
     });
+
+    await notifyViolationVerified(id);
 
     const created = await applyViolationFilters(
       violationsBaseQuery().select(VIOLATION_SELECT),

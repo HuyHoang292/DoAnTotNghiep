@@ -14,6 +14,7 @@ const VIOLATION_SELECT = [
   'v.violation_type',
   'v.evidence_image_url',
   'v.plate_image_url',
+  'v.plate_box',
   'v.evidence_video_url',
   'v.detected_at',
   'v.due_date',

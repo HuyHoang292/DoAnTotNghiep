@@ -9,7 +9,7 @@ import {
   type ViolationDetail,
   type ViolationHistory,
 } from '@/lib/api'
-import { PageHeader, Modal, PlateCloseup } from '@/components/ui'
+import { PageHeader, Modal, EvidenceImage, PlateCloseup } from '@/components/ui'
 import { formatDateTime, formatDate, formatCurrency } from '@/lib/format'
 import {
   VIOLATION_TYPE_LABEL,
@@ -213,12 +213,12 @@ function ViolationDetailPage() {
         {/* Left Column */}
         <div className="space-y-4 xl:col-span-2">
           {/* Evidence Image */}
-          <PlateCloseup src={violation.plateImageUrl} className="shadow-sm" />
           <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-            <img
+            <EvidenceImage
               src={violation.evidenceImageUrl}
+              plateBox={violation.plateBox}
+              plateText={violation.correctedPlateText || violation.detectedPlateText}
               alt="Ảnh chứng cứ"
-              className="h-auto w-full max-h-[500px] bg-slate-100 object-contain"
             />
             <div className="space-y-3 p-4">
               <div className="flex items-center gap-3">
@@ -257,6 +257,7 @@ function ViolationDetailPage() {
               </div>
             </div>
           </section>
+          <PlateCloseup src={violation.plateImageUrl} className="shadow-sm" />
 
           {/* Timeline */}
           <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">

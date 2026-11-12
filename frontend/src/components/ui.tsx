@@ -1,5 +1,6 @@
-import { type ReactNode } from 'react'
+import { useState, type ReactNode } from 'react'
 import { cn } from '@/lib/cn'
+import type { PlateBox } from '@/lib/types'
 
 export function PageHeader({
   title,
@@ -173,7 +174,9 @@ export function ViolationStatusBadge({ status }: { status: string }) {
   )
 }
 
-/** Ảnh cận biển số của vi phạm do AI ghi nhận, giúp người xem đối chiếu mà không cần phóng to ảnh toàn cảnh */
+const UNREAD_PLATE_TEXT = 'CHUA-DOC-DUOC'
+
+/** Ảnh cận biển số AI dùng để đọc ký tự, hiển thị riêng để người xem đối chiếu */
 export function PlateCloseup({ src, className = '' }: { src?: string | null; className?: string }) {
   if (!src) return null
   return (
@@ -181,7 +184,82 @@ export function PlateCloseup({ src, className = '' }: { src?: string | null; cla
       <a href={src} target="_blank" rel="noreferrer" title="Mở ảnh gốc">
         <img src={src} alt="Ảnh cận biển số" className="mx-auto max-h-56 w-full object-contain" />
       </a>
-      <figcaption className="bg-white px-3 py-1.5 text-xs font-medium text-slate-600">Ảnh cận biển số</figcaption>
+      <figcaption className="bg-white px-3 py-1.5 text-xs font-medium text-slate-600">
+        Ảnh cận biển số (AI đọc ký tự từ ảnh này)
+      </figcaption>
     </figure>
+  )
+}
+
+/**
+ * Ảnh chụp vi phạm có khung đỏ AI vẽ quanh xe. Chuỗi ký tự biển số (AI đọc từ ảnh cận biển số)
+ * được gắn vào cạnh trên khung đỏ để người xem biết biển số kể cả khi ảnh chụp từ xa không rõ.
+ * Ảnh giữ đúng tỉ lệ gốc để toạ độ khung (theo tỉ lệ 0..1) nằm đúng vị trí trên ảnh.
+ */
+export function EvidenceImage({
+  src,
+  plateBox,
+  plateText,
+  alt = 'Ảnh bằng chứng vi phạm',
+  className = '',
+  imgClassName = 'max-h-[500px]',
+  compact = false,
+}: {
+  src?: string | null
+  plateBox?: PlateBox | null
+  plateText?: string | null
+  alt?: string
+  className?: string
+  imgClassName?: string
+  compact?: boolean
+}) {
+  const [failed, setFailed] = useState(false)
+  if (!src || failed) {
+    return (
+      <div className={cn('flex h-44 items-center justify-center bg-slate-100 text-sm text-slate-500', className)}>
+        Không có ảnh
+      </div>
+    )
+  }
+
+  const raw = plateText?.trim()
+  const text = raw && raw !== UNREAD_PLATE_TEXT ? raw : null
+  let overlay: ReactNode = null
+  if (plateBox && text) {
+    // Nhãn dính vào cạnh trên khung đỏ; khung sát mép trên ảnh thì đặt nhãn vào trong khung,
+    // khung lệch phải thì canh nhãn theo cạnh phải để không bị cắt
+    const inside = plateBox.y1 < 0.06
+    const alignRight = plateBox.x1 > 0.7
+    overlay = (
+      <span
+        className={cn(
+          'pointer-events-none absolute whitespace-nowrap bg-red-600 font-mono font-bold leading-tight tracking-wide text-white',
+          compact ? 'px-1 py-px text-[10px]' : 'px-1.5 py-0.5 text-xs sm:text-sm',
+        )}
+        style={{
+          ...(alignRight ? { right: `${(1 - plateBox.x2) * 100}%` } : { left: `${plateBox.x1 * 100}%` }),
+          ...(inside ? { top: `${plateBox.y1 * 100}%` } : { bottom: `${(1 - plateBox.y1) * 100}%` }),
+        }}
+      >
+        {text}
+      </span>
+    )
+  }
+
+  return (
+    <div className={cn('flex justify-center bg-slate-900', className)}>
+      <div className="relative inline-block max-w-full overflow-hidden">
+        <a href={src} target="_blank" rel="noreferrer" title="Mở ảnh gốc">
+          <img
+            src={src}
+            alt={alt}
+            loading="lazy"
+            onError={() => setFailed(true)}
+            className={cn('block h-auto w-auto max-w-full', imgClassName)}
+          />
+        </a>
+        {overlay}
+      </div>
+    </div>
   )
 }

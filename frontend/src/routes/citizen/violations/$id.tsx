@@ -5,7 +5,7 @@ import { getCitizenDashboard } from '@/lib/api'
 import {
   EmptyState,
   PageHeader,
-  PlateCloseup,
+  EvidenceImage,
   PlateTag,
   ViolationStatusBadge,
   Modal,
@@ -76,6 +76,7 @@ function ViolationDetail() {
   const vehicle = vehicles.find((v) => v.id === violation.vehicleId)
   const invoice = invoices.find((i) => i.violationId === violation.id)
   const fine = FINE_MAP[violation.violationType]
+  const plate = vehicle?.licensePlate || violation.correctedPlateText || violation.detectedPlateText
 
   const handleAppeal = async () => {
     setAppealError('')
@@ -118,16 +119,17 @@ function ViolationDetail() {
         {/* Cột trái */}
         <div className="space-y-4 lg:col-span-2">
           {/* Ảnh chứng cứ */}
-          <PlateCloseup src={violation.plateImageUrl} className="shadow-sm" />
           <figure className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-            <img
+            <EvidenceImage
               src={violation.evidenceImageUrl}
+              plateBox={violation.plateBox}
+              plateText={plate}
               alt={`Ảnh chứng cứ vi phạm ${violation.id}`}
-              className="aspect-video w-full object-cover"
             />
             <figcaption className="border-t border-slate-100 px-4 py-2.5 text-xs text-slate-500">
-              Ảnh chứng cứ ghi nhận bởi hệ thống AI
+              {violation.source === 'OFFICER' ? 'Ảnh chứng cứ do cán bộ CSGT ghi nhận' : 'Ảnh chứng cứ ghi nhận bởi hệ thống AI'}
               {violation.cameraLocation ? ` tại ${violation.cameraLocation}` : ''}
+              {violation.plateBox ? '. Biển số xe vi phạm được ghi trên khung đỏ.' : ''}
             </figcaption>
           </figure>
 
@@ -147,8 +149,8 @@ function ViolationDetail() {
               />
               <Info
                 icon={<ScanLine className="size-4" />}
-                label="Biển số AI nhận diện"
-                value={violation.detectedPlateText}
+                label="Biển số vi phạm"
+                value={plate}
               />
               {violation.dueDate && (
                 <Info
