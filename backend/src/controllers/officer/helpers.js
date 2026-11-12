@@ -32,8 +32,24 @@ function vehicleOwnerSelect() {
     );
 }
 
+// Mã công dân theo dạng user-citizen-001, user-citizen-002, ... (tối thiểu 3 chữ số)
+const CITIZEN_ID_PREFIX = 'user-citizen-';
+
+async function nextCitizenId() {
+  const row = await db('users')
+    .whereRaw('id REGEXP ?', [`^${CITIZEN_ID_PREFIX}[0-9]+$`])
+    .max({ last: db.raw('CAST(SUBSTRING(id, ?) AS UNSIGNED)', [CITIZEN_ID_PREFIX.length + 1]) })
+    .first();
+  const next = Number(row?.last || 0) + 1;
+  return `${CITIZEN_ID_PREFIX}${String(next).padStart(3, '0')}`;
+}
+
+function isDupPrimary(error) {
+  return isDup(error) && String(error?.sqlMessage || '').includes('PRIMARY');
+}
+
 async function findCitizen(id) {
   return db('users').where({ id, role: 'CITIZEN' }).first();
 }
 
-module.exports = { now, dupMessage, isDup, vehicleOwnerSelect, findCitizen };
+module.exports = { now, dupMessage, isDup, isDupPrimary, nextCitizenId, vehicleOwnerSelect, findCitizen };

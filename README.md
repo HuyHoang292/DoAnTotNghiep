@@ -339,7 +339,7 @@ Sau khi chạy seed, mật khẩu mặc định của mọi tài khoản là **`
 |---------|-------|---------|
 | Quản trị viên | `admin@traffic.gov.vn` | |
 | Cán bộ công an | `officer@traffic.gov.vn` | |
-| Công dân | `citizen@gmail.com`, `lemai@gmail.com`, `hungpham@gmail.com` | Phải đổi mật khẩu ở lần đăng nhập đầu |
+| Công dân | `michaelhoang2902@gmail.com` (Nguyễn Sỹ Huy Hoàng, CCCD `040204001821`), `lemai@gmail.com`, `hungpham@gmail.com` | Phải đổi mật khẩu ở lần đăng nhập đầu |
 
 Công dân do cán bộ tạo mới cũng có mật khẩu mặc định `123456` và nhận thông tin tài khoản qua email.
 

@@ -38,17 +38,44 @@ function formatForVehicle(plate, vehicleClass) {
   return vehicleClass === 'motorcycle' && moto ? `${moto[1]}-${moto[2]}` : plate;
 }
 
-// OCR hay đọc thiếu ký tự chứ ít khi đọc thừa, nên ưu tiên chuỗi dài nhất; bằng nhau thì ưu tiên
-// chuỗi không phải tự sửa ký tự, rồi mới tới thứ hạng theo số lần đọc được
+// Độ dài chuỗi con chung dài nhất (không cần liền nhau) giữa 2 chuỗi
+function commonChars(a, b) {
+  let prev = new Array(b.length + 1).fill(0);
+  for (let i = 1; i <= a.length; i++) {
+    const cur = [0];
+    for (let j = 1; j <= b.length; j++) {
+      cur[j] = a[i - 1] === b[j - 1] ? prev[j - 1] + 1 : Math.max(prev[j], cur[j - 1]);
+    }
+    prev = cur;
+  }
+  return prev[b.length];
+}
+
+const digitsOnly = (s) => s.replace(/\D/g, '');
+
+// OCR hay đọc thiếu ký tự chứ ít khi đọc thừa, nên ưu tiên chuỗi dài nhất. Bằng nhau thì ưu tiên chuỗi có
+// phần chữ số khớp nhiều nhất với các lần đọc ở những khung hình khác (kể cả lần đọc thiếu ký tự hay sai định
+// dạng): chữ số đọc nhầm ở một khung hình thường được các khung hình khác đọc đúng. Chỉ so chữ số vì chữ cái
+// seri là chỗ model nhầm có hệ thống (G/B/6/8) và bị tự sửa theo định dạng, đa số ở đó không đáng tin.
+// Sau đó mới tới chuỗi không phải tự sửa ký tự, rồi thứ hạng theo số lần đọc được.
 function bestPlate(candidates, vehicleClass) {
+  const raws = (candidates || []).map((candidate) => digitsOnly(normalizePlate(candidate.text)));
   const valid = (candidates || [])
     .map((candidate, rank) => {
       const picked = pickPlateText(candidate.text);
+      if (!picked) return null;
       const raw = normalizePlate(candidate.text);
-      return picked && { candidate, rank, picked, length: raw.length, exact: normalizePlate(picked) === raw };
+      const plate = normalizePlate(picked);
+      const digits = digitsOnly(plate);
+      // So với mọi lần đọc (kể cả chính nó) để 2 chuỗi có cùng phần chữ số luôn bằng điểm nhau
+      const consensus = raws.reduce((sum, other) => sum + commonChars(digits, other), 0);
+      return { candidate, rank, picked, length: raw.length, exact: plate === raw, consensus };
     })
     .filter(Boolean)
-    .sort((a, b) => b.length - a.length || Number(b.exact) - Number(a.exact) || a.rank - b.rank);
+    .sort((a, b) => b.length - a.length
+      || b.consensus - a.consensus
+      || Number(b.exact) - Number(a.exact)
+      || a.rank - b.rank);
 
   if (valid.length === 0) return { plate: UNREAD_PLATE, confidence: 0, image: null };
   const { candidate, picked } = valid[0];
@@ -80,9 +107,9 @@ async function findDuplicate(cameraId, videoUrl, event, plate) {
   });
 }
 
-// Vi phạm ghi nhận trước khi có ảnh cận sẽ được bổ sung khi video lặp lại tới đúng xe đó
+// Vi phạm ghi nhận trước khi có ảnh cận biển số sẽ được bổ sung khi video lặp lại tới đúng xe đó
 async function backfillCloseup(eventRow, closeup) {
-  if (!eventRow.promoted_violation_id) return;
+  if (!eventRow.promoted_violation_id || !closeup) return;
   const violation = await db('violations').where('id', eventRow.promoted_violation_id).first();
   if (!violation || violation.plate_image_url) return;
   const { url } = await uploadImage(closeup, { subfolder: 'camera-events', publicId: `${eventRow.id}-closeup` });
@@ -108,6 +135,20 @@ async function backfillPlate(eventRow, plate, confidence) {
   await db('camera_events').where('id', eventRow.id).update({ detected_plate_text: plate, ocr_confidence: confidence });
 }
 
+// Khung đỏ AI vẽ quanh xe vi phạm trên ảnh bằng chứng, đổi sang tỉ lệ 0..1 của khung hình
+// (ảnh lưu trên Cloudinary có thể bị thu nhỏ); giao diện ghi ký tự biển số lên khung này
+function toPlateBox(box, size) {
+  if (!box || !size?.width || !size?.height) return null;
+  const clamp = (v) => Math.min(1, Math.max(0, v));
+  const x1 = clamp(box.x1 / size.width);
+  const y1 = clamp(box.y1 / size.height);
+  const x2 = clamp(box.x2 / size.width);
+  const y2 = clamp(box.y2 / size.height);
+  if (![x1, y1, x2, y2].every(Number.isFinite) || x2 <= x1 || y2 <= y1) return null;
+  const round = (v) => Math.round(v * 1e5) / 1e5;
+  return { x1: round(x1), y1: round(y1), x2: round(x2), y2: round(y2) };
+}
+
 function findVehicle(plate) {
   return db('vehicles')
     .whereRaw(
@@ -119,6 +160,7 @@ function findVehicle(plate) {
 
 async function saveEvent(camera, event) {
   const { plate, confidence, image } = bestPlate(event.plate_candidates, event.vehicle_class);
+  // Ảnh cận biển số (AI đọc ký tự trên ảnh này); không thấy biển thì là ảnh cận của xe
   const closeup = image || event.closeup;
   const duplicate = await findDuplicate(camera.id, camera.video_url, event, plate);
   if (duplicate) {
@@ -130,9 +172,12 @@ async function saveEvent(camera, event) {
   const eventId = crypto.randomUUID();
   const violationId = crypto.randomUUID();
   const { url: snapshotUrl } = await uploadImage(event.snapshot, { subfolder: 'camera-events', publicId: eventId });
-  const { url: plateImageUrl } = await uploadImage(closeup, { subfolder: 'camera-events', publicId: `${eventId}-closeup` });
+  const plateImageUrl = closeup
+    ? (await uploadImage(closeup, { subfolder: 'camera-events', publicId: `${eventId}-closeup` })).url
+    : null;
 
   const vehicle = plate === UNREAD_PLATE ? null : await findVehicle(plate);
+  const plateBox = toPlateBox(event.bbox, event.frame_size);
 
   const now = new Date();
   await db.transaction(async (trx) => {
@@ -145,6 +190,7 @@ async function saveEvent(camera, event) {
       violation_type: 'RED_LIGHT',
       evidence_image_url: snapshotUrl,
       plate_image_url: plateImageUrl,
+      plate_box: plateBox ? JSON.stringify(plateBox) : null,
       evidence_video_url: `${camera.video_url}#t=${Math.max(0, event.video_timestamp - 2).toFixed(1)}`,
       detected_at: now,
       status: 'AI_PENDING',

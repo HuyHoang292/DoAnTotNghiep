@@ -1,6 +1,7 @@
 const db = require('../../db/knex');
 const { mapViolation } = require('../../utils/mappers');
 const { UNREAD_PLATE } = require('../../services/cameraMonitoring');
+const { notifyViolationVerified } = require('../../services/notifications');
 const { now, VIOLATION_SELECT, violationsBaseQuery } = require('./helpers');
 
 // Lấy danh sách vi phạm chờ duyệt (AI Queue)
@@ -72,6 +73,9 @@ exports.verifyViolation = async (req, res) => {
         verified_at: now(),
         updated_at: now(),
       });
+
+    // Chỉ sau khi cán bộ duyệt, công dân mới thấy vi phạm và nhận được thông báo
+    await notifyViolationVerified(id);
 
     const updated = await db('violations').where('id', id).first();
     return res.json({ 
@@ -152,6 +156,11 @@ exports.updatePlate = async (req, res) => {
         vehicle_id: vehicle ? vehicle.id : violation.vehicle_id,
         updated_at: now(),
       });
+
+    // Vi phạm đã duyệt nhưng trước đó chưa khớp được phương tiện: giờ mới có chủ xe để thông báo
+    if (violation.status === 'OFFICER_VERIFIED' && vehicle) {
+      await notifyViolationVerified(id);
+    }
 
     const updated = await db('violations').where('id', id).first();
     return res.json({ 

@@ -8,7 +8,7 @@ import {
   lookupPlateRequest,
   type ViolationDetail,
 } from '@/lib/api'
-import { PageHeader, Modal, PlateCloseup } from '@/components/ui'
+import { PageHeader, Modal, EvidenceImage, PlateCloseup } from '@/components/ui'
 import { formatDateTime, formatCurrency } from '@/lib/format'
 import { UNREAD_PLATE, VIOLATION_TYPE_LABEL } from '@/lib/types'
 import { CheckCircle, Loader2, XCircle, AlertTriangle } from 'lucide-react'
@@ -178,15 +178,14 @@ function QueuePage() {
           {violations.map((v) => (
             <article key={v.id} className="group overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm transition-all hover:shadow-lg">
               <div className="relative">
-                <img
+                <EvidenceImage
                   src={v.evidenceImageUrl}
+                  plateBox={v.plateBox}
+                  plateText={v.detectedPlateText}
                   alt="Ảnh chứng cứ"
-                  className="h-44 w-full bg-slate-100 object-cover transition-transform group-hover:scale-105"
-                  loading="lazy"
-                  onError={(e) => {
-                    e.currentTarget.src =
-                      'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="400" height="200"><rect width="100%" height="100%" fill="%23e2e8f0"/><text x="50%" y="50%" dominant-baseline="middle" text-anchor="middle" fill="%2364748b" font-size="14">Không có ảnh</text></svg>'
-                  }}
+                  className="h-44 items-center"
+                  imgClassName="max-h-44"
+                  compact
                 />
                 <div className="absolute right-2 top-2 flex gap-2">
                   <ConfidenceBadge confidence={v.ocrConfidence} />
@@ -259,12 +258,15 @@ function QueuePage() {
           onClose={() => setActiveViolation(null)}
         >
           <div className="space-y-4">
-            <PlateCloseup src={activeViolation.plateImageUrl} />
-            <img
+            <EvidenceImage
               src={activeViolation.evidenceImageUrl}
+              plateBox={activeViolation.plateBox}
+              plateText={plate}
               alt="Ảnh chứng cứ"
-              className="h-48 w-full rounded-lg bg-slate-100 object-cover"
+              className="rounded-lg"
+              imgClassName="max-h-72"
             />
+            <PlateCloseup src={activeViolation.plateImageUrl} />
             
             <div className="space-y-2">
               <label className="block text-sm font-medium text-slate-700">

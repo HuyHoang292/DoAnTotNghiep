@@ -49,7 +49,7 @@ function LoginPage() {
 
   const quick = (type: 'citizen' | 'officer') => {
     if (type === 'citizen') {
-      setUsername('001095999888')
+      setUsername('040204001821') // Nguyễn Sỹ Huy Hoàng
       setPassword('123456')
     } else {
       setUsername('officer@traffic.gov.vn')

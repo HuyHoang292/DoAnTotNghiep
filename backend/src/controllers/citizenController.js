@@ -3,4 +3,5 @@ module.exports = {
   ...require('./citizen/dashboardController'),
   ...require('./citizen/driverLicensesController'),
   ...require('./citizen/vehiclesController'),
+  ...require('./citizen/notificationsController'),
 };

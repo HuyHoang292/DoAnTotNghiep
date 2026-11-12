@@ -1,43 +1,22 @@
+def _iou(a, b):
+    """IoU của 2 khung ký tự theo đúng toạ độ (x1, y1, x2, y2)."""
+    inter_w = max(0.0, min(a['x2'], b['x2']) - max(a['x1'], b['x1']))
+    inter_h = max(0.0, min(a['y2'], b['y2']) - max(a['y1'], b['y1']))
+    inter = inter_w * inter_h
+    union = (a['x2'] - a['x1']) * (a['y2'] - a['y1']) + (b['x2'] - b['x1']) * (b['y2'] - b['y1']) - inter
+    return inter / union if union > 0 else 0
+
+
 def _nms_chars(chars, iou_threshold=0.5):
     """
     Non-Maximum Suppression cho ký tự - loại bỏ các detection trùng lặp.
     Giữ lại ký tự có confidence cao nhất khi có overlap.
+    Dùng đúng khung của ký tự: ký tự hẹp như số 1 không bị coi là chồng lên ký tự bên cạnh.
     """
-    if not chars:
-        return []
-
-    chars = sorted(chars, key=lambda c: c['confidence'], reverse=True)
     kept_chars = []
-
-    for char in chars:
-        char_x1 = char['x_center'] - char['height'] / 2
-        char_x2 = char['x_center'] + char['height'] / 2
-        char_y1 = char['y_center'] - char['height'] / 2
-        char_y2 = char['y_center'] + char['height'] / 2
-        char_area = char['height'] * char['height']
-
-        should_keep = True
-        for kept in kept_chars:
-            kept_x1 = kept['x_center'] - kept['height'] / 2
-            kept_x2 = kept['x_center'] + kept['height'] / 2
-            kept_y1 = kept['y_center'] - kept['height'] / 2
-            kept_y2 = kept['y_center'] + kept['height'] / 2
-            kept_area = kept['height'] * kept['height']
-
-            inter_width = max(0, min(char_x2, kept_x2) - max(char_x1, kept_x1))
-            inter_height = max(0, min(char_y2, kept_y2) - max(char_y1, kept_y1))
-            inter_area = inter_width * inter_height
-
-            union_area = char_area + kept_area - inter_area
-            iou = inter_area / union_area if union_area > 0 else 0
-
-            if iou > iou_threshold:
-                should_keep = False
-                break
-
-        if should_keep:
+    for char in sorted(chars, key=lambda c: c['confidence'], reverse=True):
+        if all(_iou(char, kept) <= iou_threshold for kept in kept_chars):
             kept_chars.append(char)
-
     return kept_chars
 
 
@@ -132,6 +111,7 @@ def ghep_ky_tu_thanh_bien_so(results, model_names):
         confidence = box.conf[0].item()
         chars.append({
             'char': char_class,
+            'x1': x1, 'y1': y1, 'x2': x2, 'y2': y2,
             'x_center': (x1 + x2) / 2,
             'y_center': (y1 + y2) / 2,
             'height': y2 - y1,

@@ -22,6 +22,8 @@ exports.getDashboard = async (req, res) => {
       .leftJoin('cameras as c', 'c.id', 'v.camera_id')
       .leftJoin('fines as f', 'f.violation_type', 'v.violation_type')
       .where('veh.owner_id', ownerId)
+      // Vi phạm do AI phát hiện chỉ hiện với công dân sau khi cán bộ duyệt; vi phạm bị từ chối không hiển thị
+      .whereNotIn('v.status', ['AI_PENDING', 'REJECTED'])
       .select(
         'v.*',
         'veh.license_plate',

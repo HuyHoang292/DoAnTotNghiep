@@ -179,6 +179,20 @@ export const CAMERA_STATUS_LABEL: Record<CameraStatus, string> = {
   MAINTENANCE: 'Bảo trì',
 }
 
+/** Khung biển số trên ảnh bằng chứng, toạ độ theo tỉ lệ 0..1 của ảnh */
+export type PlateBox = { x1: number; y1: number; x2: number; y2: number }
+
+export type AppNotification = {
+  id: string
+  violationId: string | null
+  invoiceId: string | null
+  title: string
+  message: string
+  isRead: boolean
+  readAt: string | null
+  createdAt: string | null
+}
+
 export type Violation = {
   id: string
   cameraId: string
@@ -190,6 +204,7 @@ export type Violation = {
   violationType: ViolationType
   evidenceImageUrl: string
   plateImageUrl?: string | null
+  plateBox?: PlateBox | null
   evidenceVideoUrl?: string | null
   detectedAt: string
   dueDate?: string | null

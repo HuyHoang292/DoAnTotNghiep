@@ -10,6 +10,7 @@ import type {
   Vehicle,
   VehicleOwner,
   Violation,
+  AppNotification,
 } from './types'
 
 // Khi có VITE_API_URL (production/docker) thì dùng URL tuyệt đối.
@@ -112,6 +113,18 @@ export async function getCitizenDashboard() {
     violations: Violation[]
     invoices: Invoice[]
   }>('/api/citizen/dashboard')
+}
+
+export async function getCitizenNotifications() {
+  return apiFetch<{ notifications: AppNotification[]; unreadCount: number }>('/api/citizen/notifications')
+}
+
+export async function markNotificationReadRequest(id: string) {
+  return apiFetch<{ updated: number }>(`/api/citizen/notifications/${id}/read`, { method: 'POST' })
+}
+
+export async function markAllNotificationsReadRequest() {
+  return apiFetch<{ updated: number }>('/api/citizen/notifications/read-all', { method: 'POST' })
 }
 
 export async function getOfficerDashboard() {

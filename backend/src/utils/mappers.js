@@ -129,6 +129,7 @@ function mapViolation(row) {
     violationType: row.violation_type,
     evidenceImageUrl: row.evidence_image_url,
     plateImageUrl: row.plate_image_url ?? null,
+    plateBox: parseJsonColumn(row.plate_box),
     evidenceVideoUrl: row.evidence_video_url ?? null,
     detectedAt: toIso(row.detected_at),
     dueDate: toIso(row.due_date),
